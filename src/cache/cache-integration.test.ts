@@ -12,19 +12,21 @@ jest.mock('axios', () => {
       resourceType: 'Bundle',
       type: 'searchset',
       total: 1,
-      entry: [{
-        resource: {
-          resourceType: 'Patient',
-          id: 'test-patient',
-          name: [{ family: 'Doe', given: ['John'] }],
+      entry: [
+        {
+          resource: {
+            resourceType: 'Patient',
+            id: 'test-patient',
+            name: [{ family: 'Doe', given: ['John'] }],
+          },
         },
-      }],
+      ],
     },
     status: 200,
     statusText: 'OK',
     headers: {
       'cache-control': 'max-age=300',
-      'etag': '"test-etag"',
+      etag: '"test-etag"',
     },
   };
 
@@ -86,23 +88,23 @@ describe('Cache Integration', () => {
       // First request should hit the server
       const patients1 = await client.getPatients({ name: 'John' });
       expect(patients1.resourceType).toBe('Bundle');
-      
+
       // Second identical request should potentially use cache
       const patients2 = await client.getPatients({ name: 'John' });
       expect(patients2.resourceType).toBe('Bundle');
-      
+
       // Both should return the same structure
       expect(patients1).toEqual(patients2);
     });
 
     test('should provide performance statistics', async () => {
       await client.getPatients({ name: 'John' });
-      
+
       const stats = client.getStats();
       expect(stats).toHaveProperty('cache');
       expect(stats).toHaveProperty('connectionPool');
       expect(stats).toHaveProperty('resilience');
-      
+
       if (stats?.cache) {
         expect(stats.cache).toHaveProperty('strategy');
         expect(stats.cache.strategy).toBe('adaptive');
@@ -179,7 +181,9 @@ describe('Cache Integration', () => {
 
       // Both should work
       const cachedResult = await cachedClient.getPatients({ name: 'John' });
-      const nonCachedResult = await nonCachedClient.getPatients({ name: 'John' });
+      const nonCachedResult = await nonCachedClient.getPatients({
+        name: 'John',
+      });
 
       expect(cachedResult.resourceType).toBe('Bundle');
       expect(nonCachedResult.resourceType).toBe('Bundle');

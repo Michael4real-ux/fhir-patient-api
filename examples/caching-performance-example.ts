@@ -13,7 +13,7 @@ import {
   HttpCache,
   CacheManager,
   ConnectionPool
-} from '../src';
+} from '../src/index';
 
 async function main() {
   console.log('🚀 FHIR Patient API - Caching and Performance Example\n');

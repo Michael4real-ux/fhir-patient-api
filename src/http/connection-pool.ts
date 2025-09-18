@@ -2,9 +2,9 @@
  * Connection Pool implementation with HTTP/2 support
  */
 
-import http from 'http';
-import https from 'https';
-import http2 from 'http2';
+import * as http from 'http';
+import * as https from 'https';
+import * as http2 from 'http2';
 import { URL } from 'url';
 
 export interface ConnectionPoolOptions {
@@ -83,10 +83,10 @@ export class ConnectionPool {
   }> {
     const parsedUrl = new URL(url);
     const hostKey = `${parsedUrl.protocol}//${parsedUrl.host}`;
-    
+
     // Try to get existing connection
     let connection = this.connections.get(hostKey);
-    
+
     if (connection && this.isConnectionValid(connection)) {
       connection.lastUsed = Date.now();
       connection.requestCount++;
@@ -100,7 +100,7 @@ export class ConnectionPool {
     // Create new connection
     connection = await this.createConnection(parsedUrl, hostKey);
     this.connections.set(hostKey, connection);
-    
+
     return {
       agent: connection.agent,
       http2Session: connection.http2Session,
@@ -114,14 +114,15 @@ export class ConnectionPool {
   recordRequest(responseTime: number): void {
     this.stats.requestsServed++;
     this.responseTimes.push(responseTime);
-    
+
     // Keep only last 1000 response times for average calculation
     if (this.responseTimes.length > 1000) {
       this.responseTimes = this.responseTimes.slice(-1000);
     }
-    
-    this.stats.averageResponseTime = 
-      this.responseTimes.reduce((sum, time) => sum + time, 0) / this.responseTimes.length;
+
+    this.stats.averageResponseTime =
+      this.responseTimes.reduce((sum, time) => sum + time, 0) /
+      this.responseTimes.length;
   }
 
   /**
@@ -142,14 +143,14 @@ export class ConnectionPool {
     }
 
     // Close all HTTP/2 sessions
-    for (const session of this.http2Sessions.values()) {
+    for (const session of Array.from(this.http2Sessions.values())) {
       if (!session.destroyed) {
         session.close();
       }
     }
 
     // Destroy all HTTP/1.1 agents
-    for (const connection of this.connections.values()) {
+    for (const connection of Array.from(this.connections.values())) {
       if (connection.agent && 'destroy' in connection.agent) {
         connection.agent.destroy();
       }
@@ -162,7 +163,10 @@ export class ConnectionPool {
   /**
    * Create new connection
    */
-  private async createConnection(parsedUrl: URL, hostKey: string): Promise<PooledConnection> {
+  private async createConnection(
+    parsedUrl: URL,
+    hostKey: string
+  ): Promise<PooledConnection> {
     const isHttps = parsedUrl.protocol === 'https:';
     const host = parsedUrl.hostname;
     const port = parsedUrl.port || (isHttps ? '443' : '80');
@@ -170,7 +174,10 @@ export class ConnectionPool {
     // Try HTTP/2 first if enabled and HTTPS
     if (this.options.enableHttp2 && isHttps) {
       try {
-        const http2Session = await this.createHttp2Session(host, parseInt(port));
+        const http2Session = await this.createHttp2Session(
+          host,
+          parseInt(port)
+        );
         const connection: PooledConnection = {
           agent: this.createHttpAgent(isHttps), // Fallback agent
           http2Session,
@@ -188,7 +195,10 @@ export class ConnectionPool {
 
         return connection;
       } catch (error) {
-        console.debug(`HTTP/2 connection failed for ${hostKey}, falling back to HTTP/1.1:`, error);
+        console.debug(
+          `HTTP/2 connection failed for ${hostKey}, falling back to HTTP/1.1:`,
+          error
+        );
       }
     }
 
@@ -214,12 +224,15 @@ export class ConnectionPool {
   /**
    * Create HTTP/2 session
    */
-  private createHttp2Session(host: string, port: number): Promise<http2.ClientHttp2Session> {
+  private createHttp2Session(
+    host: string,
+    port: number
+  ): Promise<http2.ClientHttp2Session> {
     return new Promise((resolve, reject) => {
       const sessionOptions: http2.ClientSessionOptions = {};
 
       const session = http2.connect(`https://${host}:${port}`, sessionOptions);
-      
+
       const timeoutId = setTimeout(() => {
         session.destroy();
         reject(new Error('HTTP/2 connection timeout'));
@@ -230,13 +243,16 @@ export class ConnectionPool {
         resolve(session);
       });
 
-      session.on('error', (error) => {
+      session.on('error', error => {
         clearTimeout(timeoutId);
         reject(error);
       });
 
       session.on('close', () => {
-        this.stats.http2Connections = Math.max(0, this.stats.http2Connections - 1);
+        this.stats.http2Connections = Math.max(
+          0,
+          this.stats.http2Connections - 1
+        );
       });
     });
   }
@@ -269,7 +285,7 @@ export class ConnectionPool {
   private isConnectionValid(connection: PooledConnection): boolean {
     const now = Date.now();
     const age = now - connection.lastUsed;
-    
+
     // Check if connection is too old
     if (age > this.options.idleTimeout) {
       return false;
@@ -277,7 +293,9 @@ export class ConnectionPool {
 
     // Check HTTP/2 session
     if (connection.isHttp2 && connection.http2Session) {
-      return !connection.http2Session.destroyed && !connection.http2Session.closed;
+      return (
+        !connection.http2Session.destroyed && !connection.http2Session.closed
+      );
     }
 
     // HTTP/1.1 connections are considered valid if not too old
@@ -292,16 +310,18 @@ export class ConnectionPool {
     let idleConnections = 0;
     const connectionsByHost: Record<string, number> = {};
 
-    for (const connection of this.connections.values()) {
+    for (const connection of Array.from(this.connections.values())) {
       if (this.isConnectionValid(connection)) {
         const age = Date.now() - connection.lastUsed;
-        if (age < 5000) { // Active if used in last 5 seconds
+        if (age < 5000) {
+          // Active if used in last 5 seconds
           activeConnections++;
         } else {
           idleConnections++;
         }
 
-        connectionsByHost[connection.host] = (connectionsByHost[connection.host] || 0) + 1;
+        connectionsByHost[connection.host] =
+          (connectionsByHost[connection.host] || 0) + 1;
       }
     }
 
@@ -314,7 +334,8 @@ export class ConnectionPool {
    * Update host-specific statistics
    */
   private updateHostStats(host: string, delta: number): void {
-    this.stats.connectionsByHost[host] = (this.stats.connectionsByHost[host] || 0) + delta;
+    this.stats.connectionsByHost[host] =
+      (this.stats.connectionsByHost[host] || 0) + delta;
   }
 
   /**
@@ -323,25 +344,36 @@ export class ConnectionPool {
   private cleanup(): void {
     const expiredConnections: string[] = [];
 
-    for (const [hostKey, connection] of this.connections.entries()) {
+    for (const [hostKey, connection] of Array.from(
+      this.connections.entries()
+    )) {
       if (!this.isConnectionValid(connection)) {
         expiredConnections.push(hostKey);
-        
+
         // Close HTTP/2 session
         if (connection.http2Session && !connection.http2Session.destroyed) {
           connection.http2Session.close();
         }
-        
+
         // Destroy HTTP/1.1 agent
         if (connection.agent && 'destroy' in connection.agent) {
           connection.agent.destroy();
         }
 
-        this.stats.totalConnections = Math.max(0, this.stats.totalConnections - 1);
+        this.stats.totalConnections = Math.max(
+          0,
+          this.stats.totalConnections - 1
+        );
         if (connection.isHttp2) {
-          this.stats.http2Connections = Math.max(0, this.stats.http2Connections - 1);
+          this.stats.http2Connections = Math.max(
+            0,
+            this.stats.http2Connections - 1
+          );
         } else {
-          this.stats.http1Connections = Math.max(0, this.stats.http1Connections - 1);
+          this.stats.http1Connections = Math.max(
+            0,
+            this.stats.http1Connections - 1
+          );
         }
         this.updateHostStats(connection.host, -1);
       }

@@ -25,18 +25,20 @@ export class AuthManager {
     const headers: Record<string, string> = {};
 
     switch (this.config.type) {
-      case 'jwt':
+      case 'jwt': {
         if (!this.jwtManager) {
           throw new AuthenticationError('JWT manager not initialized');
         }
         const jwtToken = await this.jwtManager.getToken();
         headers['Authorization'] = `Bearer ${jwtToken}`;
         break;
+      }
 
-      case 'bearer':
+      case 'bearer': {
         const bearerConfig = this.config as BearerTokenConfig;
         headers['Authorization'] = `Bearer ${bearerConfig.token}`;
         break;
+      }
 
       case 'none':
         // No authentication headers needed

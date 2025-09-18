@@ -46,7 +46,7 @@ describe('EnhancedHttpClient', () => {
 
   test('should initialize with cache and connection pool', () => {
     expect(client).toBeDefined();
-    
+
     const stats = client.getStats();
     expect(stats).toHaveProperty('cache');
     expect(stats).toHaveProperty('connectionPool');
@@ -70,7 +70,7 @@ describe('EnhancedHttpClient', () => {
     // This tests the internal generateRequestId method indirectly
     const stats1 = client.getStats();
     const stats2 = client.getStats();
-    
+
     // Stats should be consistent
     expect(stats1).toEqual(stats2);
   });

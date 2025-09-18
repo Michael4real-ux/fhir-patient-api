@@ -8,9 +8,11 @@ import { FHIRClientConfig, Patient } from '../types';
 
 describe('Async Operations Integration Tests', () => {
   // Only run these tests if a test server is configured
-  const testServerUrl = process.env.FHIR_TEST_SERVER_1 || 'https://hapi.fhir.org/baseR4';
-  const shouldRunIntegrationTests = process.env.RUN_INTEGRATION_TESTS === 'true' || 
-                                   process.env.FHIR_TEST_SERVER_1;
+  const testServerUrl =
+    process.env.FHIR_TEST_SERVER_1 || 'https://hapi.fhir.org/baseR4';
+  const shouldRunIntegrationTests =
+    process.env.RUN_INTEGRATION_TESTS === 'true' ||
+    process.env.FHIR_TEST_SERVER_1;
 
   let client: FHIRClient;
 
@@ -45,11 +47,13 @@ describe('Async Operations Integration Tests', () => {
           maxConcurrency: 2,
           onProgress: (processed, total) => {
             progressCalls++;
-            console.log(`Progress: ${processed}/${total || '?'} patients processed`);
-          }
+            console.log(
+              `Progress: ${processed}/${total || '?'} patients processed`
+            );
+          },
         })) {
           streamedPatients.push(patient);
-          
+
           // Limit to prevent long-running tests
           if (streamedPatients.length >= 5) {
             break;
@@ -66,7 +70,10 @@ describe('Async Operations Integration Tests', () => {
           expect(patient.id).toBeDefined();
         });
       } catch (error) {
-        console.warn('Integration test failed, possibly due to server unavailability:', error);
+        console.warn(
+          'Integration test failed, possibly due to server unavailability:',
+          error
+        );
         // Don't fail the test if the server is unavailable
         expect(true).toBe(true);
       }
@@ -79,15 +86,11 @@ describe('Async Operations Integration Tests', () => {
       }
 
       try {
-        const queries = [
-          { _count: 2 },
-          { _count: 3 },
-          { _count: 1 }
-        ];
+        const queries = [{ _count: 2 }, { _count: 3 }, { _count: 1 }];
 
         const results = await client.getPatientsConcurrent(queries, {
           maxConcurrency: 2,
-          failFast: false
+          failFast: false,
         });
 
         expect(results.length).toBeGreaterThan(0);
@@ -99,7 +102,10 @@ describe('Async Operations Integration Tests', () => {
           expect(bundle.type).toBe('searchset');
         });
       } catch (error) {
-        console.warn('Integration test failed, possibly due to server unavailability:', error);
+        console.warn(
+          'Integration test failed, possibly due to server unavailability:',
+          error
+        );
         expect(true).toBe(true);
       }
     }, 20000);
@@ -117,8 +123,10 @@ describe('Async Operations Integration Tests', () => {
           maxResults: 10,
           maxConcurrency: 2,
           onProgress: (processed, total) => {
-            console.log(`FetchAll progress: ${processed}/${total || '?'} patients`);
-          }
+            console.log(
+              `FetchAll progress: ${processed}/${total || '?'} patients`
+            );
+          },
         });
 
         expect(allPatients.length).toBeGreaterThan(0);
@@ -130,7 +138,10 @@ describe('Async Operations Integration Tests', () => {
           expect(patient.id).toBeDefined();
         });
       } catch (error) {
-        console.warn('Integration test failed, possibly due to server unavailability:', error);
+        console.warn(
+          'Integration test failed, possibly due to server unavailability:',
+          error
+        );
         expect(true).toBe(true);
       }
     }, 25000);
@@ -145,12 +156,12 @@ describe('Async Operations Integration Tests', () => {
         const queries = [
           client.patients().limit(2),
           client.patients().limit(3),
-          client.patients().limit(1)
+          client.patients().limit(1),
         ];
 
         const results = await PatientQueryBuilder.executeParallel(queries, {
           maxConcurrency: 2,
-          failFast: false
+          failFast: false,
         });
 
         expect(results.length).toBeGreaterThan(0);
@@ -162,7 +173,10 @@ describe('Async Operations Integration Tests', () => {
           expect(bundle.type).toBe('searchset');
         });
       } catch (error) {
-        console.warn('Integration test failed, possibly due to server unavailability:', error);
+        console.warn(
+          'Integration test failed, possibly due to server unavailability:',
+          error
+        );
         expect(true).toBe(true);
       }
     }, 20000);
@@ -186,7 +200,7 @@ describe('Async Operations Integration Tests', () => {
           memoryLimit: 10 * 1024 * 1024, // 10MB limit
         })) {
           streamedPatients.push(patient);
-          
+
           // Limit to prevent very long-running tests
           if (streamedPatients.length >= 50) {
             break;
@@ -199,9 +213,14 @@ describe('Async Operations Integration Tests', () => {
         expect(streamedPatients.length).toBeGreaterThan(0);
         expect(duration).toBeLessThan(30000); // Should complete within 30 seconds
 
-        console.log(`Streamed ${streamedPatients.length} patients in ${duration}ms`);
+        console.log(
+          `Streamed ${streamedPatients.length} patients in ${duration}ms`
+        );
       } catch (error) {
-        console.warn('Performance test failed, possibly due to server unavailability:', error);
+        console.warn(
+          'Performance test failed, possibly due to server unavailability:',
+          error
+        );
         expect(true).toBe(true);
       }
     }, 35000);
@@ -219,14 +238,14 @@ describe('Async Operations Integration Tests', () => {
         const operations = Array.from({ length: 5 }, async (_, index) => {
           const queryBuilder = client.patients().limit(3);
           const results: Patient[] = [];
-          
+
           for await (const patient of queryBuilder.stream({
             pageSize: 2,
-            maxConcurrency: 2
+            maxConcurrency: 2,
           })) {
             results.push(patient);
           }
-          
+
           return { index, count: results.length };
         });
 
@@ -237,10 +256,18 @@ describe('Async Operations Integration Tests', () => {
         expect(results).toHaveLength(5);
         expect(duration).toBeLessThan(20000); // Should complete within 20 seconds
 
-        const totalPatients = results.reduce((sum, result) => sum + result.count, 0);
-        console.log(`Processed ${totalPatients} patients across ${results.length} concurrent operations in ${duration}ms`);
+        const totalPatients = results.reduce(
+          (sum, result) => sum + result.count,
+          0
+        );
+        console.log(
+          `Processed ${totalPatients} patients across ${results.length} concurrent operations in ${duration}ms`
+        );
       } catch (error) {
-        console.warn('Concurrent operations test failed, possibly due to server unavailability:', error);
+        console.warn(
+          'Concurrent operations test failed, possibly due to server unavailability:',
+          error
+        );
         expect(true).toBe(true);
       }
     }, 25000);
@@ -257,7 +284,7 @@ describe('Async Operations Integration Tests', () => {
       const errorProneClient = new FHIRClient({
         baseUrl: testServerUrl,
         timeout: 100, // Very short timeout
-        retryAttempts: 1
+        retryAttempts: 1,
       });
 
       try {
@@ -266,7 +293,7 @@ describe('Async Operations Integration Tests', () => {
 
         for await (const patient of queryBuilder.stream({
           pageSize: 5,
-          maxConcurrency: 2
+          maxConcurrency: 2,
         })) {
           streamedPatients.push(patient);
         }
@@ -291,22 +318,25 @@ describe('Async Operations Integration Tests', () => {
         const queries = [
           { _count: 2 },
           { _count: 1000000 }, // Potentially problematic large count
-          { _count: 3 }
+          { _count: 3 },
         ];
 
         const results = await client.getPatientsConcurrent(queries, {
           maxConcurrency: 2,
-          failFast: false // Don't fail on first error
+          failFast: false, // Don't fail on first error
         });
 
         // Should get at least some results even if some queries fail
         expect(results.length).toBeGreaterThan(0);
-        
+
         results.forEach(bundle => {
           expect(bundle.resourceType).toBe('Bundle');
         });
       } catch (error) {
-        console.warn('Partial failure test completed with error (expected):', error.message);
+        console.warn(
+          'Partial failure test completed with error (expected):',
+          error.message
+        );
         expect(true).toBe(true);
       }
     }, 20000);

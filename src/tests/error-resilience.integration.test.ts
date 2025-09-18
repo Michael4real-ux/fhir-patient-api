@@ -1,6 +1,6 @@
 /**
  * Comprehensive error handling and resilience integration tests
- * 
+ *
  * Tests various failure scenarios and edge cases to ensure robust
  * error handling and resilience features work together properly.
  */
@@ -58,23 +58,41 @@ describe('Error Handling and Resilience Integration', () => {
   describe('Cascading Failure Scenarios', () => {
     it('should handle server degradation gracefully', async () => {
       const successService = jest.fn().mockResolvedValue('success');
-      const serverErrorService = jest.fn().mockRejectedValue(new FHIRServerError('Server overloaded', 503));
-      const networkErrorService = jest.fn().mockRejectedValue(new FHIRNetworkError('Connection failed', new Error('ECONNRESET')));
+      const serverErrorService = jest
+        .fn()
+        .mockRejectedValue(new FHIRServerError('Server overloaded', 503));
+      const networkErrorService = jest
+        .fn()
+        .mockRejectedValue(
+          new FHIRNetworkError('Connection failed', new Error('ECONNRESET'))
+        );
 
       // First calls should succeed
-      await expect(resilienceManager.execute(successService)).resolves.toBe('success');
-      await expect(resilienceManager.execute(successService)).resolves.toBe('success');
+      await expect(resilienceManager.execute(successService)).resolves.toBe(
+        'success'
+      );
+      await expect(resilienceManager.execute(successService)).resolves.toBe(
+        'success'
+      );
 
       // Next calls should fail with server errors
-      await expect(resilienceManager.execute(serverErrorService)).rejects.toThrow('Server overloaded');
-      await expect(resilienceManager.execute(serverErrorService)).rejects.toThrow('Server overloaded');
-      await expect(resilienceManager.execute(networkErrorService)).rejects.toThrow('Connection failed');
+      await expect(
+        resilienceManager.execute(serverErrorService)
+      ).rejects.toThrow('Server overloaded');
+      await expect(
+        resilienceManager.execute(serverErrorService)
+      ).rejects.toThrow('Server overloaded');
+      await expect(
+        resilienceManager.execute(networkErrorService)
+      ).rejects.toThrow('Connection failed');
 
       // Circuit should now be open
       expect(resilienceManager.getCircuitState()).toBe(CircuitState.OPEN);
 
       // Further calls should fail fast with circuit breaker error
-      await expect(resilienceManager.execute(successService)).rejects.toThrow(CircuitBreakerError);
+      await expect(resilienceManager.execute(successService)).rejects.toThrow(
+        CircuitBreakerError
+      );
     });
 
     it('should handle intermittent network issues', async () => {
@@ -91,9 +109,15 @@ describe('Error Handling and Resilience Integration', () => {
       });
 
       // Should succeed after retries on network errors
-      await expect(resilienceManager.execute(intermittentService)).resolves.toBe('success-1');
-      await expect(resilienceManager.execute(intermittentService)).resolves.toBe('success-3');
-      await expect(resilienceManager.execute(intermittentService)).resolves.toBe('success-5');
+      await expect(
+        resilienceManager.execute(intermittentService)
+      ).resolves.toBe('success-1');
+      await expect(
+        resilienceManager.execute(intermittentService)
+      ).resolves.toBe('success-3');
+      await expect(
+        resilienceManager.execute(intermittentService)
+      ).resolves.toBe('success-5');
 
       // Circuit should remain closed for intermittent issues
       expect(resilienceManager.getCircuitState()).toBe(CircuitState.CLOSED);
@@ -119,17 +143,22 @@ describe('Error Handling and Resilience Integration', () => {
       });
 
       // First call succeeds
-      await expect(resilienceManager.execute(authExpiringService)).resolves.toBe('success');
+      await expect(
+        resilienceManager.execute(authExpiringService)
+      ).resolves.toBe('success');
 
       // Auth errors should not be retried by default
-      await expect(resilienceManager.execute(authExpiringService)).rejects.toThrow('Token expired');
+      await expect(
+        resilienceManager.execute(authExpiringService)
+      ).rejects.toThrow('Token expired');
 
       // Circuit should remain closed for auth errors (they're not expected errors)
       expect(resilienceManager.getCircuitState()).toBe(CircuitState.CLOSED);
     });
 
     it('should handle rate limiting with backoff', async () => {
-      const rateLimitedService = jest.fn()
+      const rateLimitedService = jest
+        .fn()
         .mockRejectedValueOnce(new RateLimitError('Rate limit exceeded', 1))
         .mockRejectedValueOnce(new RateLimitError('Rate limit exceeded', 1))
         .mockResolvedValue('success-after-rate-limit');
@@ -152,7 +181,10 @@ describe('Error Handling and Resilience Integration', () => {
           case 1:
             throw new FHIRServerError('Bad request', 400); // Client error - shouldn't count
           case 2:
-            throw new FHIRNetworkError('Network error', new Error('ECONNRESET')); // Should count
+            throw new FHIRNetworkError(
+              'Network error',
+              new Error('ECONNRESET')
+            ); // Should count
           case 3:
             throw new AuthenticationError('Auth failed'); // Shouldn't count
           case 4:
@@ -183,11 +215,11 @@ describe('Error Handling and Resilience Integration', () => {
     });
 
     it('should recover from open state correctly', async () => {
-      const failingService = jest.fn()
+      const failingService = jest
+        .fn()
         .mockRejectedValue(new FHIRServerError('Server error', 500));
 
-      const recoveringService = jest.fn()
-        .mockResolvedValue('recovered');
+      const recoveringService = jest.fn().mockResolvedValue('recovered');
 
       // Open the circuit
       for (let i = 0; i < 5; i++) {
@@ -207,7 +239,9 @@ describe('Error Handling and Resilience Integration', () => {
       expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN);
 
       // Successful call should close the circuit
-      await expect(circuitBreaker.execute(recoveringService)).resolves.toBe('recovered');
+      await expect(circuitBreaker.execute(recoveringService)).resolves.toBe(
+        'recovered'
+      );
       expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED);
     });
   });
@@ -222,8 +256,11 @@ describe('Error Handling and Resilience Integration', () => {
         jitterType: 'none',
       });
 
-      const failingService = jest.fn()
-        .mockRejectedValue(new FHIRNetworkError('Network error', new Error('ECONNRESET')));
+      const failingService = jest
+        .fn()
+        .mockRejectedValue(
+          new FHIRNetworkError('Network error', new Error('ECONNRESET'))
+        );
 
       const startTime = Date.now();
 
@@ -251,8 +288,11 @@ describe('Error Handling and Resilience Integration', () => {
           jitterType,
         });
 
-        const failingService = jest.fn()
-          .mockRejectedValueOnce(new FHIRNetworkError('Network error', new Error('ECONNRESET')))
+        const failingService = jest
+          .fn()
+          .mockRejectedValueOnce(
+            new FHIRNetworkError('Network error', new Error('ECONNRESET'))
+          )
           .mockResolvedValue('success');
 
         const result = await retryManagerWithJitter.execute(failingService);
@@ -277,7 +317,9 @@ describe('Error Handling and Resilience Integration', () => {
       for (const error of nonRetryableErrors) {
         const failingService = jest.fn().mockRejectedValue(error);
 
-        await expect(retryManager.execute(failingService)).rejects.toThrow(error.message);
+        await expect(retryManager.execute(failingService)).rejects.toThrow(
+          error.message
+        );
         expect(failingService).toHaveBeenCalledTimes(1); // No retries
 
         failingService.mockClear();
@@ -287,7 +329,8 @@ describe('Error Handling and Resilience Integration', () => {
 
   describe('Error Context and Logging', () => {
     it('should enrich errors with comprehensive context', async () => {
-      const contextualService = jest.fn()
+      const contextualService = jest
+        .fn()
         .mockRejectedValue(new FHIRServerError('Server error', 500));
 
       const context = {
@@ -312,8 +355,11 @@ describe('Error Handling and Resilience Integration', () => {
     });
 
     it('should provide detailed error information for debugging', async () => {
-      const debuggableService = jest.fn()
-        .mockRejectedValue(new FHIRNetworkError('Connection failed', new Error('ECONNREFUSED')));
+      const debuggableService = jest
+        .fn()
+        .mockRejectedValue(
+          new FHIRNetworkError('Connection failed', new Error('ECONNREFUSED'))
+        );
 
       try {
         await resilienceManager.execute(debuggableService);
@@ -338,7 +384,8 @@ describe('Error Handling and Resilience Integration', () => {
 
   describe('Performance and Memory', () => {
     it('should handle high-frequency requests without memory leaks', async () => {
-      const highFrequencyService = jest.fn()
+      const highFrequencyService = jest
+        .fn()
         .mockImplementation(() => Promise.resolve('success'));
 
       // Execute many requests
@@ -380,8 +427,11 @@ describe('Error Handling and Resilience Integration', () => {
 
   describe('Configuration and Customization', () => {
     it('should allow runtime configuration updates', async () => {
-      const configurableService = jest.fn()
-        .mockRejectedValue(new FHIRNetworkError('Network error', new Error('ECONNRESET')));
+      const configurableService = jest
+        .fn()
+        .mockRejectedValue(
+          new FHIRNetworkError('Network error', new Error('ECONNRESET'))
+        );
 
       // Initial configuration allows 3 attempts
       try {
@@ -395,7 +445,7 @@ describe('Error Handling and Resilience Integration', () => {
 
       // Update configuration to allow 5 attempts
       resilienceManager.updateConfig({
-        retry: { maxAttempts: 5 }
+        retry: { maxAttempts: 5 },
       });
 
       try {
@@ -414,10 +464,14 @@ describe('Error Handling and Resilience Integration', () => {
         volumeThreshold: 3,
       });
 
-      const networkErrorService = jest.fn()
-        .mockRejectedValue(new FHIRNetworkError('Network failure', new Error('ECONNRESET')));
+      const networkErrorService = jest
+        .fn()
+        .mockRejectedValue(
+          new FHIRNetworkError('Network failure', new Error('ECONNRESET'))
+        );
 
-      const serverErrorService = jest.fn()
+      const serverErrorService = jest
+        .fn()
         .mockRejectedValue(new FHIRServerError('Server error', 500));
 
       // Network errors should trigger circuit breaker

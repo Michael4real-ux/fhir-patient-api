@@ -7,13 +7,13 @@
 
 // Base classes and interfaces
 export { BaseResourceQueryBuilder } from './base-resource-query-builder';
-export { 
-  FactoryResourceQueryBuilder, 
+export {
+  FactoryResourceQueryBuilder,
   GenericResourceQueryBuilder,
   ResourceFactory,
   RegisterResource,
   defaultResourceFactory,
-  createResourceQueryBuilder
+  createResourceQueryBuilder,
 } from './resource-factory';
 export type { ResourceConfig } from './resource-factory';
 
@@ -22,21 +22,21 @@ export {
   PluginManager,
   LoggingPlugin,
   MetricsPlugin,
-  RequestIdPlugin
+  RequestIdPlugin,
 } from './plugin-system';
 export type {
   FHIRPlugin,
   FHIRRequest,
   FHIRResponse,
-  PluginContext
+  PluginContext,
 } from './plugin-system';
 
 // Example implementations
-export { 
+export {
   PractitionerQueryBuilder,
   type Practitioner,
   type PractitionerSearchParams,
-  type PractitionerSearchField
+  type PractitionerSearchField,
 } from './examples/practitioner-query-builder';
 
 // Import types for utility functions
@@ -49,7 +49,9 @@ import { ResourceConfig, defaultResourceFactory } from './resource-factory';
 /**
  * Register multiple resource types at once
  */
-export function registerResources(configs: Array<ResourceConfig<any, any>>): void {
+export function registerResources(
+  configs: Array<ResourceConfig<any, any>>
+): void {
   configs.forEach(config => {
     defaultResourceFactory.register(config);
   });
@@ -63,14 +65,16 @@ export function getRegisteredResourcesInfo(): Array<{
   searchParameters: string[];
   sortFields: string[];
 }> {
-  return defaultResourceFactory.getRegisteredResourceTypes().map((resourceType: string) => {
-    const config = defaultResourceFactory.getResourceConfig(resourceType);
-    return {
-      resourceType,
-      searchParameters: config?.searchParameters || [],
-      sortFields: config?.sortFields || []
-    };
-  });
+  return defaultResourceFactory
+    .getRegisteredResourceTypes()
+    .map((resourceType: string) => {
+      const config = defaultResourceFactory.getResourceConfig(resourceType);
+      return {
+        resourceType,
+        searchParameters: config?.searchParameters || [],
+        sortFields: config?.sortFields || [],
+      };
+    });
 }
 
 /**

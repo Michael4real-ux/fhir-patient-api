@@ -14,6 +14,7 @@ import {
   ValidationError,
   CapabilityStatement,
   ErrorResponse,
+  FHIRResource,
 } from '../types';
 import {
   AuthenticationError,
@@ -231,6 +232,92 @@ export class FHIRClient {
   }
 
   /**
+   * Search for patients with specific criteria
+   * This is an alias for getPatients for consistency with examples
+   */
+  async searchPatients(params: PatientSearchParams): Promise<Bundle<Patient>> {
+    return this.getPatients(params);
+  }
+
+  /**
+   * Generic query method for any FHIR resource type
+   * @param resourceType - The FHIR resource type to query
+   * @param params - Query parameters
+   * @returns Promise resolving to a Bundle of the specified resource type
+   */
+  async query<T extends FHIRResource>(
+    resourceType: string,
+    params?: Record<string, unknown>
+  ): Promise<Bundle<T>> {
+    try {
+      // Get authentication headers
+      const authHeaders = await this.authManager.getAuthHeaders();
+
+      // Build URL with parameters
+      const url = QueryBuilder.buildSearchUrl(
+        this.config.baseUrl,
+        resourceType,
+        params
+      );
+
+      // Make request with retry logic
+      const response = await this.httpClient.request<Bundle<T>>({
+        method: 'GET',
+        url,
+        headers: authHeaders,
+        timeout: this.config.timeout,
+      });
+
+      // Handle response
+      const bundle = ResponseHandler.handleFHIRResponse<Bundle<T>>(
+        response,
+        `Failed to query ${resourceType} resources`
+      );
+
+      return bundle;
+    } catch (error) {
+      throw this.mapError(error, `Failed to query ${resourceType} resources`);
+    }
+  }
+
+  /**
+   * Read a single resource by type and ID
+   * @param resourceType - The FHIR resource type
+   * @param id - The resource ID
+   * @returns Promise resolving to the resource
+   */
+  async read<T extends FHIRResource>(
+    resourceType: string,
+    id: string
+  ): Promise<T> {
+    try {
+      // Get authentication headers
+      const authHeaders = await this.authManager.getAuthHeaders();
+
+      // Build URL
+      const url = `${this.config.baseUrl}/${resourceType}${id ? `/${id}` : ''}`;
+
+      // Make request with retry logic
+      const response = await this.httpClient.request<T>({
+        method: 'GET',
+        url,
+        headers: authHeaders,
+        timeout: this.config.timeout,
+      });
+
+      // Handle response
+      const resource = ResponseHandler.handleFHIRResponse<T>(
+        response,
+        `Failed to read ${resourceType} resource`
+      );
+
+      return resource;
+    } catch (error) {
+      throw this.mapError(error, `Failed to read ${resourceType} resource`);
+    }
+  }
+
+  /**
    * Test connection to FHIR server with capability validation
    */
   async testConnection(): Promise<boolean> {
@@ -360,15 +447,15 @@ export class FHIRClient {
     }
   ): Promise<Bundle<Patient>[]> {
     const { maxConcurrency = 5, failFast = true } = options || {};
-    
+
     const results: Bundle<Patient>[] = [];
     const errors: Error[] = [];
 
     // Process queries in batches to respect concurrency limit
     for (let i = 0; i < queries.length; i += maxConcurrency) {
       const batch = queries.slice(i, i + maxConcurrency);
-      
-      const batchPromises = batch.map(async (params) => {
+
+      const batchPromises = batch.map(async params => {
         try {
           return await this.getPatients(params);
         } catch (error) {
@@ -381,7 +468,7 @@ export class FHIRClient {
       });
 
       const batchResults = await Promise.all(batchPromises);
-      
+
       // Add successful results
       for (const result of batchResults) {
         if (result !== null) {
@@ -392,7 +479,10 @@ export class FHIRClient {
 
     // If not failing fast, just log errors but return successful results
     if (!failFast && errors.length > 0) {
-      console.warn(`${errors.length} queries failed:`, errors.map(e => e.message).join('; '));
+      console.warn(
+        `${errors.length} queries failed:`,
+        errors.map(e => e.message).join('; ')
+      );
     }
 
     return results;
@@ -409,15 +499,15 @@ export class FHIRClient {
     }
   ): Promise<(Patient | null)[]> {
     const { maxConcurrency = 5, failFast = true } = options || {};
-    
+
     const results: (Patient | null)[] = [];
     const errors: Error[] = [];
 
     // Process IDs in batches to respect concurrency limit
     for (let i = 0; i < ids.length; i += maxConcurrency) {
       const batch = ids.slice(i, i + maxConcurrency);
-      
-      const batchPromises = batch.map(async (id) => {
+
+      const batchPromises = batch.map(async id => {
         try {
           return await this.getPatientById(id);
         } catch (error) {
@@ -435,7 +525,10 @@ export class FHIRClient {
 
     // If not failing fast, just log errors but return results (including nulls for failures)
     if (!failFast && errors.length > 0) {
-      console.warn(`${errors.length} patient fetches failed:`, errors.map(e => e.message).join('; '));
+      console.warn(
+        `${errors.length} patient fetches failed:`,
+        errors.map(e => e.message).join('; ')
+      );
     }
 
     return results;
@@ -636,7 +729,10 @@ export class FHIRClient {
         }
       }
 
-      return new FHIRNetworkError(errorMessage, new Error(details || 'Unknown error'));
+      return new FHIRNetworkError(
+        errorMessage,
+        new Error(details || 'Unknown error')
+      );
     }
 
     // Handle network/connection errors
@@ -646,21 +742,27 @@ export class FHIRClient {
       if (message.includes('timeout') || message.includes('etimedout')) {
         return new FHIRNetworkError(
           `${context}: Request timeout`,
-          new Error(`The request took too long to complete (timeout: ${this.config.timeout}ms)`)
+          new Error(
+            `The request took too long to complete (timeout: ${this.config.timeout}ms)`
+          )
         );
       }
 
       if (message.includes('econnrefused')) {
         return new FHIRNetworkError(
           `${context}: Connection refused`,
-          new Error(`Unable to connect to the FHIR server at ${this.config.baseUrl}`)
+          new Error(
+            `Unable to connect to the FHIR server at ${this.config.baseUrl}`
+          )
         );
       }
 
       if (message.includes('enotfound') || message.includes('getaddrinfo')) {
         return new FHIRNetworkError(
           `${context}: Host not found`,
-          new Error(`Unable to resolve hostname: ${new URL(this.config.baseUrl).hostname}`)
+          new Error(
+            `Unable to resolve hostname: ${new URL(this.config.baseUrl).hostname}`
+          )
         );
       }
 
@@ -682,10 +784,7 @@ export class FHIRClient {
         );
       }
 
-      return new FHIRNetworkError(
-        `${context}: ${error.message}`,
-        error
-      );
+      return new FHIRNetworkError(`${context}: ${error.message}`, error);
     }
 
     // Fallback for unknown errors

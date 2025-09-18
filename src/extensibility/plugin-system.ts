@@ -15,28 +15,28 @@ import { FHIRError } from '../errors';
 export interface FHIRPlugin {
   /** Plugin name for identification and debugging */
   name: string;
-  
+
   /** Plugin version */
   version?: string;
-  
+
   /** Plugin description */
   description?: string;
-  
+
   /** Called before a request is sent to the FHIR server */
   beforeRequest?(request: FHIRRequest): Promise<FHIRRequest>;
-  
+
   /** Called after a successful response is received */
   afterResponse?(response: FHIRResponse): Promise<FHIRResponse>;
-  
+
   /** Called when an error occurs during request processing */
   onError?(error: FHIRError, request?: FHIRRequest): Promise<FHIRError>;
-  
+
   /** Called when the plugin is installed */
   onInstall?(pluginManager: PluginManager): Promise<void>;
-  
+
   /** Called when the plugin is uninstalled */
   onUninstall?(pluginManager: PluginManager): Promise<void>;
-  
+
   /** Called when the client is destroyed */
   onDestroy?(): Promise<void>;
 }
@@ -47,16 +47,16 @@ export interface FHIRPlugin {
 export interface FHIRRequest extends RequestConfig {
   /** Plugin-specific context data */
   context?: Record<string, unknown>;
-  
+
   /** Request timestamp */
   timestamp?: number;
-  
+
   /** Unique request ID for tracing */
   requestId?: string;
-  
+
   /** Resource type being requested (if applicable) */
   resourceType?: string;
-  
+
   /** Operation type (read, search, create, update, delete) */
   operation?: 'read' | 'search' | 'create' | 'update' | 'delete' | 'patch';
 }
@@ -67,16 +67,16 @@ export interface FHIRRequest extends RequestConfig {
 export interface FHIRResponse<T = unknown> extends HttpResponse<T> {
   /** Plugin-specific context data */
   context?: Record<string, unknown>;
-  
+
   /** Response timestamp */
   timestamp?: number;
-  
+
   /** Request ID for correlation */
   requestId?: string;
-  
+
   /** Response processing time in milliseconds */
   processingTime?: number;
-  
+
   /** Whether response came from cache */
   fromCache?: boolean;
 }
@@ -87,19 +87,19 @@ export interface FHIRResponse<T = unknown> extends HttpResponse<T> {
 export interface PluginContext {
   /** Current request being processed */
   request?: FHIRRequest;
-  
+
   /** Current response being processed */
   response?: FHIRResponse;
-  
+
   /** Current error being processed */
   error?: FHIRError;
-  
+
   /** Plugin-specific data storage */
   data: Map<string, unknown>;
-  
+
   /** Abort the current operation */
   abort: (reason?: string) => void;
-  
+
   /** Skip remaining plugins in the chain */
   skip: () => void;
 }
@@ -204,18 +204,23 @@ export class PluginManager {
         try {
           context.request = currentRequest;
           currentRequest = await plugin.beforeRequest(currentRequest);
-          
+
           // Check if operation was aborted
           if (context.data.has('aborted')) {
-            throw new Error(context.data.get('abortReason') as string || 'Operation aborted by plugin');
+            throw new Error(
+              (context.data.get('abortReason') as string) ||
+                'Operation aborted by plugin'
+            );
           }
-          
+
           // Check if remaining plugins should be skipped
           if (context.data.has('skip')) {
             break;
           }
         } catch (error) {
-          throw new Error(`Plugin '${pluginName}' beforeRequest hook failed: ${error}`);
+          throw new Error(
+            `Plugin '${pluginName}' beforeRequest hook failed: ${error}`
+          );
         }
       }
     }
@@ -240,18 +245,23 @@ export class PluginManager {
         try {
           context.response = currentResponse;
           currentResponse = await plugin.afterResponse(currentResponse);
-          
+
           // Check if operation was aborted
           if (context.data.has('aborted')) {
-            throw new Error(context.data.get('abortReason') as string || 'Operation aborted by plugin');
+            throw new Error(
+              (context.data.get('abortReason') as string) ||
+                'Operation aborted by plugin'
+            );
           }
-          
+
           // Check if remaining plugins should be skipped
           if (context.data.has('skip')) {
             break;
           }
         } catch (error) {
-          throw new Error(`Plugin '${pluginName}' afterResponse hook failed: ${error}`);
+          throw new Error(
+            `Plugin '${pluginName}' afterResponse hook failed: ${error}`
+          );
         }
       }
     }
@@ -262,7 +272,10 @@ export class PluginManager {
   /**
    * Execute onError hooks
    */
-  async executeOnError(error: FHIRError, request?: FHIRRequest): Promise<FHIRError> {
+  async executeOnError(
+    error: FHIRError,
+    request?: FHIRRequest
+  ): Promise<FHIRError> {
     if (this.isDestroyed) {
       return error;
     }
@@ -276,14 +289,17 @@ export class PluginManager {
         try {
           context.error = currentError;
           currentError = await plugin.onError(currentError, request);
-          
+
           // Check if remaining plugins should be skipped
           if (context.data.has('skip')) {
             break;
           }
         } catch (pluginError) {
           // If a plugin's error handler fails, log it but continue with original error
-          console.warn(`Plugin '${pluginName}' onError hook failed:`, pluginError);
+          console.warn(
+            `Plugin '${pluginName}' onError hook failed:`,
+            pluginError
+          );
         }
       }
     }
@@ -302,7 +318,7 @@ export class PluginManager {
     this.isDestroyed = true;
 
     // Call destroy hooks for all plugins
-    const destroyPromises = this.pluginOrder.map(async (pluginName) => {
+    const destroyPromises = this.pluginOrder.map(async pluginName => {
       const plugin = this.plugins.get(pluginName);
       if (plugin?.onDestroy) {
         try {
@@ -329,7 +345,7 @@ export class PluginManager {
     error?: FHIRError
   ): PluginContext {
     const data = new Map<string, unknown>();
-    
+
     return {
       request,
       response,
@@ -341,7 +357,7 @@ export class PluginManager {
       },
       skip: () => {
         data.set('skip', true);
-      }
+      },
     };
   }
 }
@@ -378,7 +394,7 @@ export class LoggingPlugin implements FHIRPlugin {
       logErrors: true,
       logLevel: 'info',
       logger: console,
-      ...options
+      ...options,
     };
   }
 
@@ -386,15 +402,15 @@ export class LoggingPlugin implements FHIRPlugin {
     if (this.options.logRequests) {
       const logger = this.options.logger!;
       const logLevel = this.options.logLevel!;
-      
+
       logger[logLevel](`[FHIR Request] ${request.method} ${request.url}`, {
         requestId: request.requestId,
         resourceType: request.resourceType,
         operation: request.operation,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
-    
+
     return request;
   }
 
@@ -402,31 +418,34 @@ export class LoggingPlugin implements FHIRPlugin {
     if (this.options.logResponses) {
       const logger = this.options.logger!;
       const logLevel = this.options.logLevel!;
-      
-      logger[logLevel](`[FHIR Response] ${response.status} ${response.statusText}`, {
-        requestId: response.requestId,
-        processingTime: response.processingTime,
-        fromCache: response.fromCache,
-        timestamp: new Date().toISOString()
-      });
+
+      logger[logLevel](
+        `[FHIR Response] ${response.status} ${response.statusText}`,
+        {
+          requestId: response.requestId,
+          processingTime: response.processingTime,
+          fromCache: response.fromCache,
+          timestamp: new Date().toISOString(),
+        }
+      );
     }
-    
+
     return response;
   }
 
   async onError(error: FHIRError, request?: FHIRRequest): Promise<FHIRError> {
     if (this.options.logErrors) {
       const logger = this.options.logger!;
-      
+
       logger.error(`[FHIR Error] ${error.message}`, {
         requestId: request?.requestId,
         url: request?.url,
         method: request?.method,
         error: error.name,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
-    
+
     return error;
   }
 }
@@ -446,7 +465,7 @@ export class MetricsPlugin implements FHIRPlugin {
     averageResponseTime: 0,
     cacheHitCount: 0,
     cacheMissCount: 0,
-    statusCodes: new Map<number, number>()
+    statusCodes: new Map<number, number>(),
   };
 
   async beforeRequest(request: FHIRRequest): Promise<FHIRRequest> {
@@ -460,9 +479,10 @@ export class MetricsPlugin implements FHIRPlugin {
     if (response.requestId && response.timestamp) {
       const responseTime = now - response.timestamp;
       response.processingTime = responseTime;
-      
+
       this.metrics.totalResponseTime += responseTime;
-      this.metrics.averageResponseTime = this.metrics.totalResponseTime / this.metrics.requestCount;
+      this.metrics.averageResponseTime =
+        this.metrics.totalResponseTime / this.metrics.requestCount;
     }
 
     // Track status codes
@@ -490,9 +510,11 @@ export class MetricsPlugin implements FHIRPlugin {
   getMetrics() {
     return {
       ...this.metrics,
-      cacheHitRate: this.metrics.cacheHitCount / (this.metrics.cacheHitCount + this.metrics.cacheMissCount) || 0,
+      cacheHitRate:
+        this.metrics.cacheHitCount /
+          (this.metrics.cacheHitCount + this.metrics.cacheMissCount) || 0,
       errorRate: this.metrics.errorCount / this.metrics.requestCount || 0,
-      statusCodes: Object.fromEntries(this.metrics.statusCodes)
+      statusCodes: Object.fromEntries(this.metrics.statusCodes),
     };
   }
 
@@ -507,7 +529,7 @@ export class MetricsPlugin implements FHIRPlugin {
       averageResponseTime: 0,
       cacheHitCount: 0,
       cacheMissCount: 0,
-      statusCodes: new Map<number, number>()
+      statusCodes: new Map<number, number>(),
     };
   }
 }
@@ -528,20 +550,21 @@ export class RequestIdPlugin implements FHIRPlugin {
   ) {
     this.options = {
       header: 'X-Request-ID',
-      generator: () => `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-      ...options
+      generator: () =>
+        `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      ...options,
     };
   }
 
   async beforeRequest(request: FHIRRequest): Promise<FHIRRequest> {
     const requestId = this.options.generator!();
-    
+
     request.requestId = requestId;
     request.headers = {
       ...request.headers,
-      [this.options.header!]: requestId
+      [this.options.header!]: requestId,
     };
-    
+
     return request;
   }
 
@@ -551,7 +574,7 @@ export class RequestIdPlugin implements FHIRPlugin {
     if (requestId) {
       response.requestId = requestId;
     }
-    
+
     return response;
   }
 }

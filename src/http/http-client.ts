@@ -8,13 +8,13 @@ import axios, {
   AxiosResponse,
   AxiosError,
 } from 'axios';
-import https from 'https';
+import * as https from 'https';
 import { HttpResponse, RequestConfig, OperationOutcome } from '../types';
-import { 
-  FHIRNetworkError, 
-  FHIRServerError, 
+import {
+  FHIRNetworkError,
+  FHIRServerError,
   RateLimitError,
-  ErrorContext 
+  ErrorContext,
 } from '../errors';
 import { ResilienceManager } from '../utils/resilience-manager';
 
@@ -46,20 +46,22 @@ export class HttpClient {
     });
 
     // Initialize resilience manager
-    this.resilienceManager = config.resilience || new ResilienceManager({
-      retry: {
-        maxAttempts: 3,
-        baseDelay: 1000,
-        maxDelay: 10000,
-        jitterType: 'full',
-      },
-      circuitBreaker: {
-        failureThreshold: 5,
-        recoveryTimeout: 30000,
-        volumeThreshold: 10,
-        errorPercentageThreshold: 50,
-      },
-    });
+    this.resilienceManager =
+      config.resilience ||
+      new ResilienceManager({
+        retry: {
+          maxAttempts: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          jitterType: 'full',
+        },
+        circuitBreaker: {
+          failureThreshold: 5,
+          recoveryTimeout: 30000,
+          volumeThreshold: 10,
+          errorPercentageThreshold: 50,
+        },
+      });
 
     // Add response interceptor for error handling
     this.axiosInstance.interceptors.response.use(
@@ -133,14 +135,19 @@ export class HttpClient {
       // Server responded with error status
       const status = error.response.status;
       const responseData = error.response.data;
-      
-      context.responseHeaders = error.response.headers as Record<string, string>;
+
+      context.responseHeaders = error.response.headers as Record<
+        string,
+        string
+      >;
 
       // Handle rate limiting
       if (status === 429) {
         const retryAfter = error.response.headers['retry-after'];
-        const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined;
-        
+        const retryAfterSeconds = retryAfter
+          ? parseInt(retryAfter, 10)
+          : undefined;
+
         return new RateLimitError(
           'Rate limit exceeded',
           retryAfterSeconds,
@@ -190,7 +197,8 @@ export class HttpClient {
         'Request setup error',
         error,
         context,
-        error.message || 'An unknown error occurred while setting up the request'
+        error.message ||
+          'An unknown error occurred while setting up the request'
       );
     }
   }

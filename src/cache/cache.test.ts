@@ -25,7 +25,7 @@ describe('Cache Functionality', () => {
     test('should store and retrieve values', () => {
       cache.set('key1', { data: 'value1' });
       const result = cache.get('key1');
-      
+
       expect(result).toEqual({ data: 'value1' });
     });
 
@@ -34,9 +34,9 @@ describe('Cache Functionality', () => {
       expect(result).toBeNull();
     });
 
-    test('should handle TTL expiration', (done) => {
+    test('should handle TTL expiration', done => {
       cache.set('key1', { data: 'value1' }, 100); // 100ms TTL
-      
+
       setTimeout(() => {
         const result = cache.get('key1');
         expect(result).toBeNull();
@@ -48,7 +48,7 @@ describe('Cache Functionality', () => {
       cache.set('key1', { data: 'value1' });
       cache.get('key1');
       cache.get('nonexistent');
-      
+
       const stats = cache.getStats();
       expect(stats.hits).toBe(1);
       expect(stats.misses).toBe(1);
@@ -58,9 +58,9 @@ describe('Cache Functionality', () => {
     test('should clear all entries', () => {
       cache.set('key1', { data: 'value1' });
       cache.set('key2', { data: 'value2' });
-      
+
       cache.clear();
-      
+
       expect(cache.get('key1')).toBeNull();
       expect(cache.get('key2')).toBeNull();
       expect(cache.getStats().currentEntries).toBe(0);
@@ -90,13 +90,13 @@ describe('Cache Functionality', () => {
         statusText: 'OK',
         headers: {
           'cache-control': 'max-age=300',
-          'etag': '"test-etag"',
+          etag: '"test-etag"',
         },
       };
 
       cache.set('key1', response);
       const result = cache.get('key1');
-      
+
       expect(result).toEqual(response);
     });
 
@@ -112,7 +112,7 @@ describe('Cache Functionality', () => {
 
       cache.set('key1', response);
       const result = cache.get('key1');
-      
+
       expect(result).toBeNull();
     });
 
@@ -123,16 +123,18 @@ describe('Cache Functionality', () => {
         statusText: 'OK',
         headers: {
           'cache-control': 'max-age=300',
-          'etag': '"test-etag"',
+          etag: '"test-etag"',
           'last-modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
         },
       };
 
       cache.set('key1', response);
       const validationHeaders = cache.getValidationHeaders('key1');
-      
+
       expect(validationHeaders['If-None-Match']).toBe('"test-etag"');
-      expect(validationHeaders['If-Modified-Since']).toBe('Wed, 21 Oct 2015 07:28:00 GMT');
+      expect(validationHeaders['If-Modified-Since']).toBe(
+        'Wed, 21 Oct 2015 07:28:00 GMT'
+      );
     });
   });
 
@@ -166,14 +168,14 @@ describe('Cache Functionality', () => {
 
       await cacheManager.set('key1', response);
       const result = await cacheManager.get('key1');
-      
+
       expect(result).toEqual(response);
     });
 
     test('should generate cache keys consistently', () => {
       const key1 = CacheManager.generateKey('/api/patients', { name: 'John' });
       const key2 = CacheManager.generateKey('/api/patients', { name: 'John' });
-      
+
       expect(key1).toBe(key2);
     });
 
@@ -188,21 +190,21 @@ describe('Cache Functionality', () => {
       await cacheManager.set('/api/patients/1', response);
       await cacheManager.set('/api/patients/2', response);
       await cacheManager.set('/api/practitioners/1', response);
-      
+
       const invalidatedCount = cacheManager.invalidate('/api/patients');
-      
+
       expect(invalidatedCount).toBeGreaterThan(0);
-      
+
       const result1 = await cacheManager.get('/api/patients/1');
       const result2 = await cacheManager.get('/api/practitioners/1');
-      
+
       expect(result1).toBeNull();
       expect(result2).toEqual(response); // Should not be invalidated
     });
 
     test('should provide statistics', () => {
       const stats = cacheManager.getStats();
-      
+
       expect(stats).toHaveProperty('strategy');
       expect(stats).toHaveProperty('enabled');
       expect(stats.strategy).toBe('adaptive');

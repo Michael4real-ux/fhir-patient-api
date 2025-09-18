@@ -8,22 +8,20 @@
 import { Bundle, FHIRResource, BaseSearchParams } from '../types';
 import { FHIRValidationError } from '../errors';
 import { BaseResourceQueryBuilder } from './base-resource-query-builder';
-import { 
-  ResourceFactory
-} from './resource-factory';
-import { 
-  PluginManager, 
-  LoggingPlugin, 
-  MetricsPlugin, 
+import { ResourceFactory } from './resource-factory';
+import {
+  PluginManager,
+  LoggingPlugin,
+  MetricsPlugin,
   RequestIdPlugin,
   FHIRPlugin,
   FHIRRequest,
-  FHIRResponse
+  FHIRResponse,
 } from './plugin-system';
-import { 
-  PractitionerQueryBuilder, 
-  Practitioner, 
-  PractitionerSearchParams 
+import {
+  PractitionerQueryBuilder,
+  Practitioner,
+  PractitionerSearchParams,
 } from './examples/practitioner-query-builder';
 
 // Test resource types
@@ -39,7 +37,10 @@ interface TestSearchParams extends BaseSearchParams {
 }
 
 // Test query builder implementation
-class TestResourceQueryBuilder extends BaseResourceQueryBuilder<TestResource, TestSearchParams> {
+class TestResourceQueryBuilder extends BaseResourceQueryBuilder<
+  TestResource,
+  TestSearchParams
+> {
   protected readonly resourceType = 'TestResource';
 
   where(field: keyof TestSearchParams, value: string | number | boolean): this {
@@ -47,7 +48,10 @@ class TestResourceQueryBuilder extends BaseResourceQueryBuilder<TestResource, Te
   }
 
   clone(): this {
-    const cloned = new TestResourceQueryBuilder(this.baseUrl, this.executeFunction) as this;
+    const cloned = new TestResourceQueryBuilder(
+      this.baseUrl,
+      this.executeFunction
+    ) as this;
     cloned.params = { ...this.params };
     return cloned;
   }
@@ -59,16 +63,23 @@ class TestResourceQueryBuilder extends BaseResourceQueryBuilder<TestResource, Te
 
 describe('BaseResourceQueryBuilder', () => {
   let queryBuilder: TestResourceQueryBuilder;
-  let mockExecuteFunction: jest.MockedFunction<(params: TestSearchParams) => Promise<Bundle<TestResource>>>;
+  let mockExecuteFunction: jest.MockedFunction<
+    (params: TestSearchParams) => Promise<Bundle<TestResource>>
+  >;
 
   beforeEach(() => {
     mockExecuteFunction = jest.fn();
-    queryBuilder = new TestResourceQueryBuilder('https://example.com/fhir', mockExecuteFunction);
+    queryBuilder = new TestResourceQueryBuilder(
+      'https://example.com/fhir',
+      mockExecuteFunction
+    );
   });
 
   describe('Basic functionality', () => {
     it('should initialize with correct base URL and execute function', () => {
-      expect(queryBuilder.buildUrl()).toBe('https://example.com/fhir/TestResource');
+      expect(queryBuilder.buildUrl()).toBe(
+        'https://example.com/fhir/TestResource'
+      );
     });
 
     it('should handle limit parameter', () => {
@@ -103,16 +114,22 @@ describe('BaseResourceQueryBuilder', () => {
     });
 
     it('should validate sort fields', () => {
-      expect(() => queryBuilder.sort('invalid-field')).toThrow(FHIRValidationError);
+      expect(() => queryBuilder.sort('invalid-field')).toThrow(
+        FHIRValidationError
+      );
     });
 
     it('should handle include parameter', () => {
       queryBuilder.include('TestResource:related');
-      expect(queryBuilder.getParams()._include).toEqual(['TestResource:related']);
+      expect(queryBuilder.getParams()._include).toEqual([
+        'TestResource:related',
+      ]);
     });
 
     it('should validate include format', () => {
-      expect(() => queryBuilder.include('invalid-format')).toThrow(FHIRValidationError);
+      expect(() => queryBuilder.include('invalid-format')).toThrow(
+        FHIRValidationError
+      );
     });
 
     it('should handle summary parameter', () => {
@@ -121,7 +138,9 @@ describe('BaseResourceQueryBuilder', () => {
     });
 
     it('should validate summary parameter', () => {
-      expect(() => queryBuilder.summary('invalid' as any)).toThrow(FHIRValidationError);
+      expect(() => queryBuilder.summary('invalid' as any)).toThrow(
+        FHIRValidationError
+      );
     });
 
     it('should handle elements parameter', () => {
@@ -131,7 +150,9 @@ describe('BaseResourceQueryBuilder', () => {
 
     it('should validate elements parameter', () => {
       expect(() => queryBuilder.elements([])).toThrow(FHIRValidationError);
-      expect(() => queryBuilder.elements(['', 'name'])).toThrow(FHIRValidationError);
+      expect(() => queryBuilder.elements(['', 'name'])).toThrow(
+        FHIRValidationError
+      );
     });
   });
 
@@ -146,10 +167,10 @@ describe('BaseResourceQueryBuilder', () => {
             resource: {
               resourceType: 'TestResource',
               id: '1',
-              name: 'Test'
-            }
-          }
-        ]
+              name: 'Test',
+            },
+          },
+        ],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -159,7 +180,7 @@ describe('BaseResourceQueryBuilder', () => {
 
       expect(mockExecuteFunction).toHaveBeenCalledWith({
         name: 'Test',
-        _count: 10
+        _count: 10,
       });
       expect(result).toBe(mockBundle);
     });
@@ -174,10 +195,10 @@ describe('BaseResourceQueryBuilder', () => {
             resource: {
               resourceType: 'TestResource',
               id: '1',
-              name: 'Test'
-            }
-          }
-        ]
+              name: 'Test',
+            },
+          },
+        ],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -186,7 +207,7 @@ describe('BaseResourceQueryBuilder', () => {
       expect(result).toEqual({
         resourceType: 'TestResource',
         id: '1',
-        name: 'Test'
+        name: 'Test',
       });
     });
 
@@ -195,7 +216,7 @@ describe('BaseResourceQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 0,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -208,7 +229,7 @@ describe('BaseResourceQueryBuilder', () => {
       const mockBundle: Bundle<TestResource> = {
         resourceType: 'Bundle',
         type: 'searchset',
-        total: 42
+        total: 42,
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -258,7 +279,7 @@ describe('ResourceFactory', () => {
         resourceType: 'TestResource',
         searchParameters: ['name', 'active'],
         sortFields: ['name', '_id'],
-        queryBuilderClass: TestResourceQueryBuilder
+        queryBuilderClass: TestResourceQueryBuilder,
       };
 
       factory.register(config);
@@ -272,7 +293,7 @@ describe('ResourceFactory', () => {
         resourceType: 'TestResource',
         searchParameters: ['name'],
         sortFields: ['name'],
-        queryBuilderClass: TestResourceQueryBuilder
+        queryBuilderClass: TestResourceQueryBuilder,
       };
 
       factory.register(config);
@@ -284,7 +305,7 @@ describe('ResourceFactory', () => {
         resourceType: 'TestResource',
         searchParameters: ['name'],
         sortFields: ['name'],
-        queryBuilderClass: TestResourceQueryBuilder
+        queryBuilderClass: TestResourceQueryBuilder,
       };
 
       factory.register(config);
@@ -307,21 +328,30 @@ describe('ResourceFactory', () => {
         resourceType: 'TestResource',
         searchParameters: ['name'],
         sortFields: ['name'],
-        queryBuilderClass: TestResourceQueryBuilder
+        queryBuilderClass: TestResourceQueryBuilder,
       };
 
       factory.register(config);
 
       const mockExecuteFunction = jest.fn();
-      const queryBuilder = factory.createQueryBuilder('TestResource', 'https://example.com', mockExecuteFunction);
+      const queryBuilder = factory.createQueryBuilder(
+        'TestResource',
+        'https://example.com',
+        mockExecuteFunction
+      );
 
       expect(queryBuilder).toBeInstanceOf(TestResourceQueryBuilder);
     });
 
     it('should throw error for unregistered resource', () => {
       const mockExecuteFunction = jest.fn();
-      expect(() => factory.createQueryBuilder('UnknownResource', 'https://example.com', mockExecuteFunction))
-        .toThrow('not registered');
+      expect(() =>
+        factory.createQueryBuilder(
+          'UnknownResource',
+          'https://example.com',
+          mockExecuteFunction
+        )
+      ).toThrow('not registered');
     });
   });
 
@@ -331,21 +361,27 @@ describe('ResourceFactory', () => {
         resourceType: 'TestResource',
         searchParameters: ['name', 'active'],
         sortFields: ['name'],
-        queryBuilderClass: TestResourceQueryBuilder
+        queryBuilderClass: TestResourceQueryBuilder,
       };
 
       factory.register(config);
     });
 
     it('should validate search parameters', () => {
-      const result = factory.validateSearchParams('TestResource', { name: 'test' });
+      const result = factory.validateSearchParams('TestResource', {
+        name: 'test',
+      });
       expect(result.isValid).toBe(true);
     });
 
     it('should reject invalid search parameters', () => {
-      const result = factory.validateSearchParams('TestResource', { invalid: 'test' } as any);
+      const result = factory.validateSearchParams('TestResource', {
+        invalid: 'test',
+      } as any);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Invalid search parameter 'invalid' for resource type 'TestResource'");
+      expect(result.errors).toContain(
+        "Invalid search parameter 'invalid' for resource type 'TestResource'"
+      );
     });
 
     it('should validate sort fields', () => {
@@ -370,7 +406,7 @@ describe('PluginManager', () => {
     it('should install a plugin', async () => {
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        version: '1.0.0'
+        version: '1.0.0',
       };
 
       await pluginManager.use(plugin);
@@ -381,18 +417,20 @@ describe('PluginManager', () => {
 
     it('should prevent duplicate plugin installation', async () => {
       const plugin: FHIRPlugin = {
-        name: 'test-plugin'
+        name: 'test-plugin',
       };
 
       await pluginManager.use(plugin);
-      await expect(pluginManager.use(plugin)).rejects.toThrow('already installed');
+      await expect(pluginManager.use(plugin)).rejects.toThrow(
+        'already installed'
+      );
     });
 
     it('should call plugin onInstall hook', async () => {
       const onInstall = jest.fn();
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        onInstall
+        onInstall,
       };
 
       await pluginManager.use(plugin);
@@ -404,7 +442,7 @@ describe('PluginManager', () => {
       const onUninstall = jest.fn();
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        onUninstall
+        onUninstall,
       };
 
       await pluginManager.use(plugin);
@@ -423,17 +461,19 @@ describe('PluginManager', () => {
 
   describe('Plugin execution', () => {
     it('should execute beforeRequest hooks', async () => {
-      const beforeRequest = jest.fn().mockImplementation((req: FHIRRequest) => Promise.resolve(req));
+      const beforeRequest = jest
+        .fn()
+        .mockImplementation((req: FHIRRequest) => Promise.resolve(req));
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        beforeRequest
+        beforeRequest,
       };
 
       await pluginManager.use(plugin);
 
       const request: FHIRRequest = {
         method: 'GET',
-        url: 'https://example.com/Patient'
+        url: 'https://example.com/Patient',
       };
 
       const result = await pluginManager.executeBeforeRequest(request);
@@ -443,10 +483,12 @@ describe('PluginManager', () => {
     });
 
     it('should execute afterResponse hooks', async () => {
-      const afterResponse = jest.fn().mockImplementation((res: FHIRResponse) => Promise.resolve(res));
+      const afterResponse = jest
+        .fn()
+        .mockImplementation((res: FHIRResponse) => Promise.resolve(res));
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        afterResponse
+        afterResponse,
       };
 
       await pluginManager.use(plugin);
@@ -455,7 +497,7 @@ describe('PluginManager', () => {
         data: {},
         status: 200,
         statusText: 'OK',
-        headers: {}
+        headers: {},
       };
 
       const result = await pluginManager.executeAfterResponse(response);
@@ -465,10 +507,12 @@ describe('PluginManager', () => {
     });
 
     it('should execute onError hooks', async () => {
-      const onError = jest.fn().mockImplementation((err: any) => Promise.resolve(err));
+      const onError = jest
+        .fn()
+        .mockImplementation((err: any) => Promise.resolve(err));
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        onError
+        onError,
       };
 
       await pluginManager.use(plugin);
@@ -485,18 +529,18 @@ describe('PluginManager', () => {
 
       const plugin1: FHIRPlugin = {
         name: 'plugin1',
-        beforeRequest: async (req) => {
+        beforeRequest: async req => {
           executionOrder.push('plugin1');
           return req;
-        }
+        },
       };
 
       const plugin2: FHIRPlugin = {
         name: 'plugin2',
-        beforeRequest: async (req) => {
+        beforeRequest: async req => {
           executionOrder.push('plugin2');
           return req;
-        }
+        },
       };
 
       await pluginManager.use(plugin1);
@@ -504,7 +548,7 @@ describe('PluginManager', () => {
 
       await pluginManager.executeBeforeRequest({
         method: 'GET',
-        url: 'https://example.com/Patient'
+        url: 'https://example.com/Patient',
       });
 
       expect(executionOrder).toEqual(['plugin1', 'plugin2']);
@@ -516,7 +560,7 @@ describe('PluginManager', () => {
       const onDestroy = jest.fn();
       const plugin: FHIRPlugin = {
         name: 'test-plugin',
-        onDestroy
+        onDestroy,
       };
 
       await pluginManager.use(plugin);
@@ -529,7 +573,7 @@ describe('PluginManager', () => {
       await pluginManager.destroy();
 
       const plugin: FHIRPlugin = {
-        name: 'test-plugin'
+        name: 'test-plugin',
       };
 
       await expect(pluginManager.use(plugin)).rejects.toThrow('destroyed');
@@ -544,18 +588,18 @@ describe('Built-in Plugins', () => {
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       };
 
       const plugin = new LoggingPlugin({
         logger: mockLogger,
-        logLevel: 'info'
+        logLevel: 'info',
       });
 
       const request: FHIRRequest = {
         method: 'GET',
         url: 'https://example.com/Patient',
-        requestId: 'test-123'
+        requestId: 'test-123',
       };
 
       const response: FHIRResponse = {
@@ -563,7 +607,7 @@ describe('Built-in Plugins', () => {
         status: 200,
         statusText: 'OK',
         headers: {},
-        requestId: 'test-123'
+        requestId: 'test-123',
       };
 
       await plugin.beforeRequest!(request);
@@ -577,17 +621,17 @@ describe('Built-in Plugins', () => {
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       };
 
       const plugin = new LoggingPlugin({
-        logger: mockLogger
+        logger: mockLogger,
       });
 
       const error = new Error('Test error') as any;
       const request: FHIRRequest = {
         method: 'GET',
-        url: 'https://example.com/Patient'
+        url: 'https://example.com/Patient',
       };
 
       await plugin.onError!(error, request);
@@ -603,7 +647,7 @@ describe('Built-in Plugins', () => {
       const request: FHIRRequest = {
         method: 'GET',
         url: 'https://example.com/Patient',
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       const response: FHIRResponse = {
@@ -611,7 +655,7 @@ describe('Built-in Plugins', () => {
         status: 200,
         statusText: 'OK',
         headers: {},
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       await plugin.beforeRequest!(request);
@@ -634,11 +678,11 @@ describe('Built-in Plugins', () => {
 
     it('should reset metrics', () => {
       const plugin = new MetricsPlugin();
-      
+
       // Add some metrics
       plugin.beforeRequest!({
         method: 'GET',
-        url: 'https://example.com/Patient'
+        url: 'https://example.com/Patient',
       });
 
       plugin.resetMetrics();
@@ -654,7 +698,7 @@ describe('Built-in Plugins', () => {
       const request: FHIRRequest = {
         method: 'GET',
         url: 'https://example.com/Patient',
-        headers: {}
+        headers: {},
       };
 
       const result = await plugin.beforeRequest!(request);
@@ -665,13 +709,13 @@ describe('Built-in Plugins', () => {
 
     it('should use custom header name', async () => {
       const plugin = new RequestIdPlugin({
-        header: 'Custom-Request-ID'
+        header: 'Custom-Request-ID',
       });
 
       const request: FHIRRequest = {
         method: 'GET',
         url: 'https://example.com/Patient',
-        headers: {}
+        headers: {},
       };
 
       const result = await plugin.beforeRequest!(request);
@@ -683,16 +727,23 @@ describe('Built-in Plugins', () => {
 
 describe('PractitionerQueryBuilder Example', () => {
   let queryBuilder: PractitionerQueryBuilder;
-  let mockExecuteFunction: jest.MockedFunction<(params: PractitionerSearchParams) => Promise<Bundle<Practitioner>>>;
+  let mockExecuteFunction: jest.MockedFunction<
+    (params: PractitionerSearchParams) => Promise<Bundle<Practitioner>>
+  >;
 
   beforeEach(() => {
     mockExecuteFunction = jest.fn();
-    queryBuilder = new PractitionerQueryBuilder('https://example.com/fhir', mockExecuteFunction);
+    queryBuilder = new PractitionerQueryBuilder(
+      'https://example.com/fhir',
+      mockExecuteFunction
+    );
   });
 
   it('should create practitioner query builder', () => {
     expect(queryBuilder).toBeInstanceOf(PractitionerQueryBuilder);
-    expect(queryBuilder.buildUrl()).toBe('https://example.com/fhir/Practitioner');
+    expect(queryBuilder.buildUrl()).toBe(
+      'https://example.com/fhir/Practitioner'
+    );
   });
 
   it('should handle practitioner-specific where clauses', () => {
@@ -716,7 +767,9 @@ describe('PractitionerQueryBuilder Example', () => {
   });
 
   it('should validate gender values', () => {
-    expect(() => queryBuilder.where('gender', 'invalid')).toThrow(FHIRValidationError);
+    expect(() => queryBuilder.where('gender', 'invalid')).toThrow(
+      FHIRValidationError
+    );
   });
 
   it('should clone correctly', () => {

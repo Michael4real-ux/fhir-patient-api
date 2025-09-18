@@ -1,35 +1,64 @@
 {
   "name": "fhir-patient-api",
   "version": "1.0.0",
+  "type": "commonjs",
   "description": "A user-friendly JavaScript/TypeScript API for downloading patient data from any FHIR server",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docs"
   ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup",
+    "build:prod": "NODE_ENV=production tsup",
+    "build:analyze": "npm run build:prod && npx bundlesize",
+    "dev": "tsup --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:unit": "jest --testPathPattern=comprehensive-unit",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:comprehensive": "jest --coverage --testPathPattern=comprehensive-unit",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build && npm run test && npm run lint"
+    "examples": "npx ts-node examples/index.ts",
+    "examples:basic": "npx ts-node examples/basic-usage-example.ts",
+    "examples:advanced": "npx ts-node examples/advanced-queries-example.ts",
+    "examples:caching": "npx ts-node examples/caching-performance-example.ts",
+    "examples:extensibility": "npx ts-node examples/extensibility-examples.ts",
+    "examples:errors": "npx ts-node examples/error-handling-example.ts",
+    "examples:auth": "npx ts-node examples/authentication-example.ts",
+    "docs:api": "echo 'API documentation available at docs/API.md'",
+    "docs:troubleshooting": "echo 'Troubleshooting guide available at docs/TROUBLESHOOTING.md'",
+    "docs:best-practices": "echo 'Best practices guide available at docs/BEST_PRACTICES.md'",
+    "prepublishOnly": "npm run clean && npm run build:prod && npm run test && npm run lint && npm run size-check",
+    "size-check": "npx bundlesize",
+    "package-check": "npx publint",
+    "release:dry": "npm publish --dry-run",
+    "release:check": "npm run package-check && npm run release:dry",
+    "release:prepare": "node scripts/prepare-release.js"
   },
   "keywords": [
     "fhir",
@@ -47,11 +76,13 @@
     "@types/node": "^20.6.3",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "bundlesize": "^0.18.1",
     "eslint": "^8.49.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "jest": "^29.7.0",
     "prettier": "^3.0.3",
+    "publint": "^0.2.5",
     "ts-jest": "^29.1.1",
     "tsup": "^7.2.0",
     "typescript": "^5.3.3"
@@ -70,5 +101,15 @@
   "bugs": {
     "url": "https://github.com/username/fhir-patient-api/issues"
   },
-  "homepage": "https://github.com/username/fhir-patient-api#readme"
+  "homepage": "https://github.com/username/fhir-patient-api#readme",
+  "bundlesize": [
+    {
+      "path": "./dist/index.js",
+      "maxSize": "100 kB"
+    },
+    {
+      "path": "./dist/index.mjs",
+      "maxSize": "100 kB"
+    }
+  ]
 }

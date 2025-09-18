@@ -67,19 +67,26 @@ export class RetryManager {
     for (let attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
       try {
         const result = await fn();
-        
+
         // If we succeeded after retries, enhance the context to indicate this
         if (attempt > 1 && context) {
-          (context as Partial<ErrorContext> & { succeededAfterRetries?: number }).succeededAfterRetries = attempt - 1;
+          (
+            context as Partial<ErrorContext> & {
+              succeededAfterRetries?: number;
+            }
+          ).succeededAfterRetries = attempt - 1;
         }
-        
+
         return result;
       } catch (error) {
         lastError = error as Error;
         const elapsedTime = Date.now() - startTime;
 
         // Check if we should retry
-        if (attempt === this.config.maxAttempts || !this.shouldRetry(error as Error)) {
+        if (
+          attempt === this.config.maxAttempts ||
+          !this.shouldRetry(error as Error)
+        ) {
           // Enhance error with retry context
           if (error instanceof FHIRError) {
             // Create enhanced context
@@ -90,12 +97,15 @@ export class RetryManager {
               totalRetries: this.config.maxAttempts,
               elapsedTime,
             };
-            
+
             // Create new error with enhanced context based on error type
             let enhancedError: FHIRError;
-            
+
             if (error.constructor.name === 'FHIRServerError') {
-              const serverError = error as FHIRError & { statusCode: number; operationOutcome?: unknown };
+              const serverError = error as FHIRError & {
+                statusCode: number;
+                operationOutcome?: unknown;
+              };
               const ErrorConstructor = error.constructor as new (
                 message: string,
                 statusCode: number,
@@ -111,7 +121,9 @@ export class RetryManager {
                 error.details
               );
             } else if (error.constructor.name === 'FHIRNetworkError') {
-              const networkError = error as FHIRError & { originalError: Error };
+              const networkError = error as FHIRError & {
+                originalError: Error;
+              };
               const ErrorConstructor = error.constructor as new (
                 message: string,
                 originalError: Error,
@@ -139,7 +151,9 @@ export class RetryManager {
                 error.details
               );
             } else if (error.constructor.name === 'CircuitBreakerError') {
-              const circuitError = error as FHIRError & { circuitState: 'OPEN' | 'HALF_OPEN' };
+              const circuitError = error as FHIRError & {
+                circuitState: 'OPEN' | 'HALF_OPEN';
+              };
               const ErrorConstructor = error.constructor as new (
                 message: string,
                 circuitState: 'OPEN' | 'HALF_OPEN',
@@ -151,7 +165,9 @@ export class RetryManager {
                 enhancedContext
               );
             } else if (error.constructor.name === 'RateLimitError') {
-              const rateLimitError = error as FHIRError & { retryAfter?: number };
+              const rateLimitError = error as FHIRError & {
+                retryAfter?: number;
+              };
               const ErrorConstructor = error.constructor as new (
                 message: string,
                 retryAfter: number | undefined,
@@ -175,7 +191,7 @@ export class RetryManager {
                 error.details
               );
             }
-            
+
             throw enhancedError;
           }
           throw error;
@@ -183,7 +199,7 @@ export class RetryManager {
 
         // Calculate delay with jitter
         const actualDelay = this.calculateDelay(delay, attempt);
-        
+
         // Log retry attempt (in production, use proper logging)
         console.warn(
           `Retry attempt ${attempt}/${this.config.maxAttempts} after ${actualDelay}ms delay. Error: ${lastError.message}`
@@ -193,7 +209,10 @@ export class RetryManager {
         await this.sleep(actualDelay);
 
         // Update delay for next iteration
-        delay = Math.min(delay * this.config.backoffMultiplier, this.config.maxDelay);
+        delay = Math.min(
+          delay * this.config.backoffMultiplier,
+          this.config.maxDelay
+        );
       }
     }
 
@@ -241,20 +260,22 @@ export class RetryManager {
       case 'none':
         // No jitter, use base delay
         break;
-      
+
       case 'full':
         // Full jitter: random value between 0 and delay
         delay = Math.random() * delay;
         break;
-      
+
       case 'equal':
         // Equal jitter: base delay + random value between 0 and delay
         delay = delay + Math.random() * delay;
         break;
-      
+
       case 'decorrelated':
         // Decorrelated jitter: random value between base delay and 3 * previous delay
-        delay = Math.random() * (3 * delay - this.config.baseDelay) + this.config.baseDelay;
+        delay =
+          Math.random() * (3 * delay - this.config.baseDelay) +
+          this.config.baseDelay;
         break;
     }
 

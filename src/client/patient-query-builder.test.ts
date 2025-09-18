@@ -7,7 +7,10 @@ import { Bundle, Patient, PatientSearchParams } from '../types';
 import { FHIRValidationError } from '../errors';
 
 describe('PatientQueryBuilder', () => {
-  let mockExecuteFunction: jest.Mock<Promise<Bundle<Patient>>, [PatientSearchParams]>;
+  let mockExecuteFunction: jest.Mock<
+    Promise<Bundle<Patient>>,
+    [PatientSearchParams]
+  >;
   let queryBuilder: PatientQueryBuilder;
   const baseUrl = 'https://example.com/fhir';
 
@@ -47,9 +50,7 @@ describe('PatientQueryBuilder', () => {
     });
 
     it('should handle multiple values for the same field (OR logic)', () => {
-      queryBuilder
-        .where('family', 'Smith')
-        .where('family', 'Johnson');
+      queryBuilder.where('family', 'Smith').where('family', 'Johnson');
 
       const params = queryBuilder.getParams();
       expect(params.family).toBe('Smith,Johnson');
@@ -61,7 +62,10 @@ describe('PatientQueryBuilder', () => {
         .where('_include', 'Patient:general-practitioner');
 
       const params = queryBuilder.getParams();
-      expect(params._include).toEqual(['Patient:organization', 'Patient:general-practitioner']);
+      expect(params._include).toEqual([
+        'Patient:organization',
+        'Patient:general-practitioner',
+      ]);
     });
 
     it('should throw error for empty field name', () => {
@@ -193,9 +197,7 @@ describe('PatientQueryBuilder', () => {
     });
 
     it('should handle multiple sort fields', () => {
-      queryBuilder
-        .sort('family', 'asc')
-        .sort('given', 'desc');
+      queryBuilder.sort('family', 'asc').sort('given', 'desc');
 
       const params = queryBuilder.getParams();
       expect(params._sort).toBe('family,-given');
@@ -218,8 +220,17 @@ describe('PatientQueryBuilder', () => {
     });
 
     it('should accept valid sort fields', () => {
-      const validFields = ['name', 'family', 'given', 'birthdate', 'gender', 'identifier', '_lastUpdated', '_id'];
-      
+      const validFields = [
+        'name',
+        'family',
+        'given',
+        'birthdate',
+        'gender',
+        'identifier',
+        '_lastUpdated',
+        '_id',
+      ];
+
       validFields.forEach(field => {
         expect(() => {
           new PatientQueryBuilder(baseUrl, mockExecuteFunction).sort(field);
@@ -241,7 +252,10 @@ describe('PatientQueryBuilder', () => {
         .include('Patient:general-practitioner');
 
       const params = queryBuilder.getParams();
-      expect(params._include).toEqual(['Patient:organization', 'Patient:general-practitioner']);
+      expect(params._include).toEqual([
+        'Patient:organization',
+        'Patient:general-practitioner',
+      ]);
     });
 
     it('should not add duplicate includes', () => {
@@ -324,8 +338,13 @@ describe('PatientQueryBuilder', () => {
     });
 
     it('should accept all valid summary modes', () => {
-      const validModes: Array<'true' | 'text' | 'data' | 'count' | 'false'> = 
-        ['true', 'text', 'data', 'count', 'false'];
+      const validModes: Array<'true' | 'text' | 'data' | 'count' | 'false'> = [
+        'true',
+        'text',
+        'data',
+        'count',
+        'false',
+      ];
 
       validModes.forEach(mode => {
         expect(() => {
@@ -371,7 +390,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 1,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -381,7 +400,7 @@ describe('PatientQueryBuilder', () => {
 
       expect(mockExecuteFunction).toHaveBeenCalledWith({
         family: 'Smith',
-        _count: 10
+        _count: 10,
       });
       expect(result).toBe(mockBundle);
     });
@@ -400,14 +419,14 @@ describe('PatientQueryBuilder', () => {
       const mockPatient: Patient = {
         resourceType: 'Patient',
         id: 'patient-1',
-        name: [{ family: 'Smith' }]
+        name: [{ family: 'Smith' }],
       };
 
       const mockBundle: Bundle<Patient> = {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 1,
-        entry: [{ resource: mockPatient }]
+        entry: [{ resource: mockPatient }],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -422,7 +441,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 0,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -433,18 +452,18 @@ describe('PatientQueryBuilder', () => {
 
     it('should not modify original parameters', async () => {
       queryBuilder.limit(50);
-      
+
       const mockBundle: Bundle<Patient> = {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 0,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
 
       await queryBuilder.first();
-      
+
       const params = queryBuilder.getParams();
       expect(params._count).toBe(50);
     });
@@ -456,7 +475,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 42,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -470,7 +489,7 @@ describe('PatientQueryBuilder', () => {
       const mockBundle: Bundle<Patient> = {
         resourceType: 'Bundle',
         type: 'searchset',
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -481,18 +500,18 @@ describe('PatientQueryBuilder', () => {
 
     it('should not modify original parameters', async () => {
       queryBuilder.summary('text');
-      
+
       const mockBundle: Bundle<Patient> = {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 5,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
 
       await queryBuilder.count();
-      
+
       const params = queryBuilder.getParams();
       expect(params._summary).toBe('text');
     });
@@ -501,9 +520,21 @@ describe('PatientQueryBuilder', () => {
   describe('stream() method', () => {
     it('should stream all patients from multiple pages', async () => {
       const mockPatients: Patient[] = [
-        { resourceType: 'Patient', id: 'patient-1', name: [{ family: 'Smith' }] },
-        { resourceType: 'Patient', id: 'patient-2', name: [{ family: 'Johnson' }] },
-        { resourceType: 'Patient', id: 'patient-3', name: [{ family: 'Brown' }] }
+        {
+          resourceType: 'Patient',
+          id: 'patient-1',
+          name: [{ family: 'Smith' }],
+        },
+        {
+          resourceType: 'Patient',
+          id: 'patient-2',
+          name: [{ family: 'Johnson' }],
+        },
+        {
+          resourceType: 'Patient',
+          id: 'patient-3',
+          name: [{ family: 'Brown' }],
+        },
       ];
 
       // Mock first page (2 results)
@@ -511,10 +542,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 3,
-        entry: [
-          { resource: mockPatients[0] },
-          { resource: mockPatients[1] }
-        ]
+        entry: [{ resource: mockPatients[0] }, { resource: mockPatients[1] }],
       };
 
       // Mock second page (1 result)
@@ -522,9 +550,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 3,
-        entry: [
-          { resource: mockPatients[2] }
-        ]
+        entry: [{ resource: mockPatients[2] }],
       };
 
       mockExecuteFunction
@@ -545,8 +571,14 @@ describe('PatientQueryBuilder', () => {
 
       // Verify pagination calls
       expect(mockExecuteFunction).toHaveBeenCalledTimes(2);
-      expect(mockExecuteFunction).toHaveBeenNthCalledWith(1, { _count: 2, _offset: 0 });
-      expect(mockExecuteFunction).toHaveBeenNthCalledWith(2, { _count: 2, _offset: 2 });
+      expect(mockExecuteFunction).toHaveBeenNthCalledWith(1, {
+        _count: 2,
+        _offset: 0,
+      });
+      expect(mockExecuteFunction).toHaveBeenNthCalledWith(2, {
+        _count: 2,
+        _offset: 2,
+      });
     });
 
     it('should handle empty results', async () => {
@@ -554,7 +586,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 0,
-        entry: []
+        entry: [],
       };
 
       mockExecuteFunction.mockResolvedValue(emptyBundle);
@@ -573,9 +605,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 1,
-        entry: [
-          { resource: { resourceType: 'Patient', id: 'patient-1' } }
-        ]
+        entry: [{ resource: { resourceType: 'Patient', id: 'patient-1' } }],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -586,7 +616,10 @@ describe('PatientQueryBuilder', () => {
       }
 
       expect(streamedPatients).toHaveLength(1);
-      expect(mockExecuteFunction).toHaveBeenCalledWith({ _count: 50, _offset: 0 });
+      expect(mockExecuteFunction).toHaveBeenCalledWith({
+        _count: 50,
+        _offset: 0,
+      });
     });
 
     it('should handle pagination without total count', async () => {
@@ -595,16 +628,14 @@ describe('PatientQueryBuilder', () => {
         type: 'searchset',
         entry: [
           { resource: { resourceType: 'Patient', id: 'patient-1' } },
-          { resource: { resourceType: 'Patient', id: 'patient-2' } }
-        ]
+          { resource: { resourceType: 'Patient', id: 'patient-2' } },
+        ],
       };
 
       const secondPageBundle: Bundle<Patient> = {
         resourceType: 'Bundle',
         type: 'searchset',
-        entry: [
-          { resource: { resourceType: 'Patient', id: 'patient-3' } }
-        ]
+        entry: [{ resource: { resourceType: 'Patient', id: 'patient-3' } }],
       };
 
       mockExecuteFunction
@@ -629,9 +660,7 @@ describe('PatientQueryBuilder', () => {
         resourceType: 'Bundle',
         type: 'searchset',
         total: 1,
-        entry: [
-          { resource: { resourceType: 'Patient', id: 'patient-1' } }
-        ]
+        entry: [{ resource: { resourceType: 'Patient', id: 'patient-1' } }],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -652,8 +681,8 @@ describe('PatientQueryBuilder', () => {
         type: 'searchset',
         total: 1,
         entry: [
-          {} // Entry without resource
-        ]
+          {}, // Entry without resource
+        ],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -675,8 +704,8 @@ describe('PatientQueryBuilder', () => {
         total: 12,
         entry: [
           { resource: { resourceType: 'Patient', id: 'patient-11' } },
-          { resource: { resourceType: 'Patient', id: 'patient-12' } }
-        ]
+          { resource: { resourceType: 'Patient', id: 'patient-12' } },
+        ],
       };
 
       mockExecuteFunction.mockResolvedValue(mockBundle);
@@ -687,16 +716,16 @@ describe('PatientQueryBuilder', () => {
       }
 
       expect(streamedPatients).toHaveLength(2);
-      expect(mockExecuteFunction).toHaveBeenCalledWith({ _count: 5, _offset: 10 });
+      expect(mockExecuteFunction).toHaveBeenCalledWith({
+        _count: 5,
+        _offset: 10,
+      });
     });
   });
 
   describe('buildUrl() method', () => {
     it('should build correct URL with parameters', () => {
-      queryBuilder
-        .where('family', 'Smith')
-        .where('gender', 'male')
-        .limit(10);
+      queryBuilder.where('family', 'Smith').where('gender', 'male').limit(10);
 
       const url = queryBuilder.buildUrl();
       expect(url).toContain('https://example.com/fhir/Patient');
@@ -717,13 +746,10 @@ describe('PatientQueryBuilder', () => {
 
   describe('reset() method', () => {
     it('should clear all parameters', () => {
-      queryBuilder
-        .where('family', 'Smith')
-        .limit(10)
-        .sort('name');
+      queryBuilder.where('family', 'Smith').limit(10).sort('name');
 
       queryBuilder.reset();
-      
+
       const params = queryBuilder.getParams();
       expect(params).toEqual({});
     });
@@ -742,7 +768,7 @@ describe('PatientQueryBuilder', () => {
         .include('Patient:organization');
 
       const cloned = queryBuilder.clone();
-      
+
       expect(cloned).not.toBe(queryBuilder);
       expect(cloned.getParams()).toEqual(queryBuilder.getParams());
     });
@@ -750,9 +776,9 @@ describe('PatientQueryBuilder', () => {
     it('should create independent copies', () => {
       queryBuilder.where('family', 'Smith');
       const cloned = queryBuilder.clone();
-      
+
       cloned.where('given', 'John');
-      
+
       expect(queryBuilder.getParams().given).toBeUndefined();
       expect(cloned.getParams().given).toBe('John');
     });
@@ -760,12 +786,12 @@ describe('PatientQueryBuilder', () => {
     it('should deep clone array parameters', () => {
       queryBuilder.include('Patient:organization');
       const cloned = queryBuilder.clone();
-      
+
       cloned.include('Patient:general-practitioner');
-      
+
       const originalIncludes = queryBuilder.getParams()._include as string[];
       const clonedIncludes = cloned.getParams()._include as string[];
-      
+
       expect(originalIncludes).toHaveLength(1);
       expect(clonedIncludes).toHaveLength(2);
       expect(originalIncludes).not.toBe(clonedIncludes);
@@ -785,7 +811,7 @@ describe('PatientQueryBuilder', () => {
         .elements(['id', 'name']);
 
       expect(result).toBe(queryBuilder);
-      
+
       const params = queryBuilder.getParams();
       expect(params.family).toBe('Smith');
       expect(params.gender).toBe('male');
@@ -819,7 +845,10 @@ describe('PatientQueryBuilder', () => {
       expect(params.active).toBe('true');
       expect(params._count).toBe(50);
       expect(params._sort).toBe('family,given');
-      expect(params._include).toEqual(['Patient:organization', 'Patient:general-practitioner']);
+      expect(params._include).toEqual([
+        'Patient:organization',
+        'Patient:general-practitioner',
+      ]);
     });
 
     it('should handle date range queries', () => {

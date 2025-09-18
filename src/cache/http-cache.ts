@@ -65,7 +65,7 @@ export class HttpCache {
     }
 
     const validation = this.validateCacheEntry(entry);
-    
+
     if (!validation.isValid) {
       this.cache.delete(key);
       return null;
@@ -89,9 +89,13 @@ export class HttpCache {
   /**
    * Store response in cache
    */
-  set(key: string, response: HttpResponse, requestHeaders?: Record<string, string>): void {
+  set(
+    key: string,
+    response: HttpResponse,
+    requestHeaders?: Record<string, string>
+  ): void {
     const cacheEntry = this.createCacheEntry(response, requestHeaders);
-    
+
     // Don't cache if no-store directive is present
     if (cacheEntry.noStore) {
       return;
@@ -99,14 +103,17 @@ export class HttpCache {
 
     // Calculate TTL based on cache headers
     const ttl = this.calculateTTL(cacheEntry);
-    
+
     this.cache.set(key, cacheEntry, ttl);
   }
 
   /**
    * Check if response can be served from cache
    */
-  canServeFromCache(key: string, requestHeaders?: Record<string, string>): CacheValidationResult {
+  canServeFromCache(
+    key: string,
+    requestHeaders?: Record<string, string>
+  ): CacheValidationResult {
     const entry = this.cache.get(key);
     if (!entry) {
       return {
@@ -129,11 +136,11 @@ export class HttpCache {
     }
 
     const headers: Record<string, string> = {};
-    
+
     if (entry.etag) {
       headers['If-None-Match'] = entry.etag;
     }
-    
+
     if (entry.lastModified) {
       headers['If-Modified-Since'] = entry.lastModified;
     }
@@ -153,7 +160,7 @@ export class HttpCache {
     // Update cache headers from 304 response
     const updatedEntry = this.updateCacheHeaders(entry, response);
     const ttl = this.calculateTTL(updatedEntry);
-    
+
     this.cache.set(key, updatedEntry, ttl);
   }
 
@@ -163,22 +170,22 @@ export class HttpCache {
   invalidate(pattern: string | RegExp): number {
     let invalidatedCount = 0;
     const keys = this.cache.keys();
-    
+
     for (const key of keys) {
       let shouldInvalidate = false;
-      
+
       if (typeof pattern === 'string') {
         shouldInvalidate = key.includes(pattern);
       } else {
         shouldInvalidate = pattern.test(key);
       }
-      
+
       if (shouldInvalidate) {
         this.cache.delete(key);
         invalidatedCount++;
       }
     }
-    
+
     return invalidatedCount;
   }
 
@@ -206,15 +213,20 @@ export class HttpCache {
   /**
    * Create cache entry from HTTP response
    */
-  private createCacheEntry(response: HttpResponse, _requestHeaders?: Record<string, string>): HttpCacheEntry {
+  private createCacheEntry(
+    response: HttpResponse,
+    _requestHeaders?: Record<string, string>
+  ): HttpCacheEntry {
     const headers = response.headers;
     const cacheControl = this.parseCacheControl(headers['cache-control'] || '');
-    
+
     const entry: HttpCacheEntry = {
       response,
       etag: headers['etag'],
       lastModified: headers['last-modified'],
-      expires: headers['expires'] ? new Date(headers['expires']).getTime() : undefined,
+      expires: headers['expires']
+        ? new Date(headers['expires']).getTime()
+        : undefined,
       maxAge: cacheControl.maxAge,
       staleWhileRevalidate: cacheControl.staleWhileRevalidate,
       mustRevalidate: cacheControl.mustRevalidate || false,
@@ -240,7 +252,10 @@ export class HttpCache {
     private: boolean;
     public: boolean;
   } {
-    const directives = cacheControl.toLowerCase().split(',').map(d => d.trim());
+    const directives = cacheControl
+      .toLowerCase()
+      .split(',')
+      .map(d => d.trim());
     const result = {
       mustRevalidate: false,
       noCache: false,
@@ -265,7 +280,8 @@ export class HttpCache {
         if (maxAgeStr) {
           const maxAge = parseInt(maxAgeStr, 10);
           if (!isNaN(maxAge)) {
-            (result as typeof result & { maxAge: number }).maxAge = maxAge * 1000; // Convert to milliseconds
+            (result as typeof result & { maxAge: number }).maxAge =
+              maxAge * 1000; // Convert to milliseconds
           }
         }
       } else if (directive.startsWith('stale-while-revalidate=')) {
@@ -273,7 +289,9 @@ export class HttpCache {
         if (swrStr) {
           const swr = parseInt(swrStr, 10);
           if (!isNaN(swr)) {
-            (result as typeof result & { staleWhileRevalidate: number }).staleWhileRevalidate = swr * 1000; // Convert to milliseconds
+            (
+              result as typeof result & { staleWhileRevalidate: number }
+            ).staleWhileRevalidate = swr * 1000; // Convert to milliseconds
           }
         }
       }
@@ -296,7 +314,7 @@ export class HttpCache {
     }
 
     const now = Date.now();
-    
+
     // Use max-age if available
     if (entry.maxAge !== undefined) {
       return entry.maxAge;
@@ -315,13 +333,16 @@ export class HttpCache {
   /**
    * Validate cache entry
    */
-  private validateCacheEntry(entry: HttpCacheEntry, _requestHeaders?: Record<string, string>): CacheValidationResult {
+  private validateCacheEntry(
+    entry: HttpCacheEntry,
+    _requestHeaders?: Record<string, string>
+  ): CacheValidationResult {
     const now = Date.now();
     const age = now - entry.cachedAt;
-    
+
     // Check if entry is fresh
     let maxAge = entry.maxAge || this.options.defaultTTL;
-    
+
     // Handle expires header
     if (entry.expires !== undefined && entry.maxAge === undefined) {
       maxAge = entry.expires - entry.cachedAt;
@@ -329,14 +350,16 @@ export class HttpCache {
 
     const isFresh = age < maxAge;
     const isStale = !isFresh;
-    
+
     // Check if must revalidate
     const needsRevalidation = entry.mustRevalidate && isStale;
-    
+
     // Check request cache-control headers
     if (_requestHeaders) {
-      const requestCacheControl = this.parseCacheControl(_requestHeaders['cache-control'] || '');
-      
+      const requestCacheControl = this.parseCacheControl(
+        _requestHeaders['cache-control'] || ''
+      );
+
       if (requestCacheControl.noCache) {
         return {
           isValid: false,
@@ -349,8 +372,10 @@ export class HttpCache {
     }
 
     // Entry is valid if fresh or if stale-while-revalidate is allowed
-    const isValid = isFresh || (isStale && this.options.staleWhileRevalidate && !needsRevalidation);
-    
+    const isValid =
+      isFresh ||
+      (isStale && this.options.staleWhileRevalidate && !needsRevalidation);
+
     return {
       isValid,
       isStale,
@@ -363,17 +388,26 @@ export class HttpCache {
   /**
    * Update cache headers from 304 response
    */
-  private updateCacheHeaders(entry: HttpCacheEntry, response: HttpResponse): HttpCacheEntry {
+  private updateCacheHeaders(
+    entry: HttpCacheEntry,
+    response: HttpResponse
+  ): HttpCacheEntry {
     const headers = response.headers;
     const cacheControl = this.parseCacheControl(headers['cache-control'] || '');
-    
+
     return {
       ...entry,
       etag: headers['etag'] || entry.etag,
       lastModified: headers['last-modified'] || entry.lastModified,
-      expires: headers['expires'] ? new Date(headers['expires']).getTime() : entry.expires,
-      maxAge: cacheControl.maxAge !== undefined ? cacheControl.maxAge : entry.maxAge,
-      staleWhileRevalidate: cacheControl.staleWhileRevalidate !== undefined ? cacheControl.staleWhileRevalidate : entry.staleWhileRevalidate,
+      expires: headers['expires']
+        ? new Date(headers['expires']).getTime()
+        : entry.expires,
+      maxAge:
+        cacheControl.maxAge !== undefined ? cacheControl.maxAge : entry.maxAge,
+      staleWhileRevalidate:
+        cacheControl.staleWhileRevalidate !== undefined
+          ? cacheControl.staleWhileRevalidate
+          : entry.staleWhileRevalidate,
       mustRevalidate: cacheControl.mustRevalidate,
       noCache: cacheControl.noCache,
       noStore: cacheControl.noStore,

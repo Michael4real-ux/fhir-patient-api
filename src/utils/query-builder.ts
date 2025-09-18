@@ -2,7 +2,11 @@
  * Query string builder utilities
  */
 
-import { PatientSearchParams, ValidationResult, ValidationError } from '../types';
+import {
+  PatientSearchParams,
+  ValidationResult,
+  ValidationError,
+} from '../types';
 
 export class QueryBuilder {
   /**
@@ -78,7 +82,7 @@ export class QueryBuilder {
         errors.push({
           field: '_count',
           message: '_count must be an integer between 0 and 1000',
-          code: 'invalid-range'
+          code: 'invalid-range',
         });
       }
     }
@@ -93,7 +97,7 @@ export class QueryBuilder {
         errors.push({
           field: '_offset',
           message: '_offset must be a non-negative integer',
-          code: 'invalid-range'
+          code: 'invalid-range',
         });
       }
     }
@@ -105,7 +109,7 @@ export class QueryBuilder {
         errors.push({
           field: 'gender',
           message: `gender must be one of: ${validGenders.join(', ')}`,
-          code: 'invalid-value'
+          code: 'invalid-value',
         });
       }
     }
@@ -122,14 +126,14 @@ export class QueryBuilder {
           errors.push({
             field: 'active',
             message: 'active must be "true" or "false"',
-            code: 'invalid-value'
+            code: 'invalid-value',
           });
         }
       } else {
         errors.push({
           field: 'active',
           message: 'active must be a boolean value or "true"/"false" string',
-          code: 'invalid-type'
+          code: 'invalid-type',
         });
       }
     }
@@ -146,14 +150,14 @@ export class QueryBuilder {
           errors.push({
             field: 'deceased',
             message: 'deceased must be "true" or "false"',
-            code: 'invalid-value'
+            code: 'invalid-value',
           });
         }
       } else {
         errors.push({
           field: 'deceased',
           message: 'deceased must be a boolean value or "true"/"false" string',
-          code: 'invalid-type'
+          code: 'invalid-type',
         });
       }
     }
@@ -163,8 +167,9 @@ export class QueryBuilder {
       if (!this.isValidFHIRDate(params.birthdate)) {
         errors.push({
           field: 'birthdate',
-          message: 'birthdate must be in YYYY, YYYY-MM, or YYYY-MM-DD format and represent a valid date',
-          code: 'invalid-format'
+          message:
+            'birthdate must be in YYYY, YYYY-MM, or YYYY-MM-DD format and represent a valid date',
+          code: 'invalid-format',
         });
       }
     }
@@ -187,19 +192,19 @@ export class QueryBuilder {
           errors.push({
             field: param,
             message: `${param} must be a string`,
-            code: 'invalid-type'
+            code: 'invalid-type',
           });
         } else if (value.length > 1000) {
           errors.push({
             field: param,
             message: `${param} must be less than 1000 characters`,
-            code: 'invalid-length'
+            code: 'invalid-length',
           });
         } else if (value.trim().length === 0) {
           errors.push({
             field: param,
             message: `${param} cannot be empty or only whitespace`,
-            code: 'invalid-value'
+            code: 'invalid-value',
           });
         }
       }
@@ -212,7 +217,7 @@ export class QueryBuilder {
         errors.push({
           field: '_summary',
           message: `_summary must be one of: ${validSummary.join(', ')}`,
-          code: 'invalid-value'
+          code: 'invalid-value',
         });
       }
     }
@@ -225,8 +230,9 @@ export class QueryBuilder {
       ) {
         errors.push({
           field: '_sort',
-          message: '_sort must be a valid sort parameter (e.g., "name", "-birthdate", "family,given")',
-          code: 'invalid-format'
+          message:
+            '_sort must be a valid sort parameter (e.g., "name", "-birthdate", "family,given")',
+          code: 'invalid-format',
         });
       }
     }

@@ -2,7 +2,7 @@
  * JWT Token Management
  */
 
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { JWTConfig } from '../types';
 import { AuthenticationError } from '../errors';
 

@@ -14,26 +14,29 @@ import { FHIRValidationError } from '../errors';
  */
 export interface ResourceConfig<
   TResource extends FHIRResource,
-  TSearchParams extends BaseSearchParams = BaseSearchParams
+  TSearchParams extends BaseSearchParams = BaseSearchParams,
 > {
   /** FHIR resource type name */
   resourceType: string;
-  
+
   /** Valid search parameters for this resource */
   searchParameters: string[];
-  
+
   /** Valid sort fields for this resource */
   sortFields: string[];
-  
+
   /** Query builder class constructor */
   queryBuilderClass: new (
     baseUrl: string,
     executeFunction: (params: TSearchParams) => Promise<Bundle<TResource>>
   ) => BaseResourceQueryBuilder<TResource, TSearchParams>;
-  
+
   /** Optional validation function for resource-specific parameters */
-  validateSearchParams?: (params: TSearchParams) => { isValid: boolean; errors: string[] };
-  
+  validateSearchParams?: (params: TSearchParams) => {
+    isValid: boolean;
+    errors: string[];
+  };
+
   /** Optional parameter transformation function */
   transformParams?: (params: TSearchParams) => TSearchParams;
 }
@@ -47,15 +50,18 @@ export class ResourceFactory {
   /**
    * Register a new resource type
    */
-  register<TResource extends FHIRResource, TSearchParams extends BaseSearchParams = BaseSearchParams>(
-    config: ResourceConfig<TResource, TSearchParams>
-  ): void {
+  register<
+    TResource extends FHIRResource,
+    TSearchParams extends BaseSearchParams = BaseSearchParams,
+  >(config: ResourceConfig<TResource, TSearchParams>): void {
     if (!config.resourceType) {
       throw new Error('Resource type is required');
     }
 
     if (this.resources.has(config.resourceType)) {
-      throw new Error(`Resource type '${config.resourceType}' is already registered`);
+      throw new Error(
+        `Resource type '${config.resourceType}' is already registered`
+      );
     }
 
     // Validate configuration
@@ -91,7 +97,10 @@ export class ResourceFactory {
   /**
    * Get resource configuration
    */
-  getResourceConfig<TResource extends FHIRResource, TSearchParams extends BaseSearchParams = BaseSearchParams>(
+  getResourceConfig<
+    TResource extends FHIRResource,
+    TSearchParams extends BaseSearchParams = BaseSearchParams,
+  >(
     resourceType: string
   ): ResourceConfig<TResource, TSearchParams> | undefined {
     return this.resources.get(resourceType);
@@ -107,7 +116,10 @@ export class ResourceFactory {
   /**
    * Create a query builder for a specific resource type
    */
-  createQueryBuilder<TResource extends FHIRResource, TSearchParams extends BaseSearchParams = BaseSearchParams>(
+  createQueryBuilder<
+    TResource extends FHIRResource,
+    TSearchParams extends BaseSearchParams = BaseSearchParams,
+  >(
     resourceType: string,
     baseUrl: string,
     executeFunction: (params: TSearchParams) => Promise<Bundle<TResource>>
@@ -129,7 +141,10 @@ export class ResourceFactory {
   ): { isValid: boolean; errors: string[] } {
     const config = this.resources.get(resourceType);
     if (!config) {
-      return { isValid: false, errors: [`Resource type '${resourceType}' is not registered`] };
+      return {
+        isValid: false,
+        errors: [`Resource type '${resourceType}' is not registered`],
+      };
     }
 
     const errors: string[] = [];
@@ -137,7 +152,9 @@ export class ResourceFactory {
     // Validate that all parameters are allowed for this resource
     for (const paramName of Object.keys(params)) {
       if (!config.searchParameters.includes(paramName)) {
-        errors.push(`Invalid search parameter '${paramName}' for resource type '${resourceType}'`);
+        errors.push(
+          `Invalid search parameter '${paramName}' for resource type '${resourceType}'`
+        );
       }
     }
 
@@ -151,7 +168,7 @@ export class ResourceFactory {
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -195,16 +212,19 @@ export const defaultResourceFactory = new ResourceFactory();
 /**
  * Decorator for automatically registering resource query builders
  */
-export function RegisterResource<TResource extends FHIRResource, TSearchParams extends BaseSearchParams = BaseSearchParams>(
-  config: Omit<ResourceConfig<TResource, TSearchParams>, 'queryBuilderClass'>
-) {
-  return function <T extends new (...args: any[]) => BaseResourceQueryBuilder<TResource, TSearchParams>>(
-    constructor: T
-  ): T {
+export function RegisterResource<
+  TResource extends FHIRResource,
+  TSearchParams extends BaseSearchParams = BaseSearchParams,
+>(config: Omit<ResourceConfig<TResource, TSearchParams>, 'queryBuilderClass'>) {
+  return function <
+    T extends new (
+      ...args: any[]
+    ) => BaseResourceQueryBuilder<TResource, TSearchParams>,
+  >(constructor: T): T {
     // Register the resource with the default factory
     defaultResourceFactory.register({
       ...config,
-      queryBuilderClass: constructor as any
+      queryBuilderClass: constructor as any,
     });
 
     return constructor;
@@ -216,9 +236,8 @@ export function RegisterResource<TResource extends FHIRResource, TSearchParams e
  */
 export abstract class FactoryResourceQueryBuilder<
   TResource extends FHIRResource,
-  TSearchParams extends BaseSearchParams = BaseSearchParams
+  TSearchParams extends BaseSearchParams = BaseSearchParams,
 > extends BaseResourceQueryBuilder<TResource, TSearchParams> {
-  
   constructor(
     baseUrl: string,
     executeFunction: (params: TSearchParams) => Promise<Bundle<TResource>>
@@ -229,17 +248,23 @@ export abstract class FactoryResourceQueryBuilder<
   /**
    * Validate parameters using the resource factory
    */
-  protected override validateParams(): { isValid: boolean; errors: { field: string; message: string; code: string }[] } {
-    const factoryValidation = defaultResourceFactory.validateSearchParams(this.resourceType, this.params);
-    
+  protected override validateParams(): {
+    isValid: boolean;
+    errors: { field: string; message: string; code: string }[];
+  } {
+    const factoryValidation = defaultResourceFactory.validateSearchParams(
+      this.resourceType,
+      this.params
+    );
+
     if (!factoryValidation.isValid) {
       return {
         isValid: false,
         errors: factoryValidation.errors.map(error => ({
           field: 'unknown',
           message: error,
-          code: 'validation-error'
-        }))
+          code: 'validation-error',
+        })),
       };
     }
 
@@ -258,7 +283,10 @@ export abstract class FactoryResourceQueryBuilder<
    * Transform parameters using the resource factory
    */
   protected transformParams(params: TSearchParams): TSearchParams {
-    return defaultResourceFactory.transformSearchParams(this.resourceType, params);
+    return defaultResourceFactory.transformSearchParams(
+      this.resourceType,
+      params
+    );
   }
 }
 
@@ -267,9 +295,8 @@ export abstract class FactoryResourceQueryBuilder<
  */
 export class GenericResourceQueryBuilder<
   TResource extends FHIRResource = FHIRResource,
-  TSearchParams extends BaseSearchParams = BaseSearchParams
+  TSearchParams extends BaseSearchParams = BaseSearchParams,
 > extends FactoryResourceQueryBuilder<TResource, TSearchParams> {
-  
   constructor(
     resourceType: string,
     baseUrl: string,
@@ -306,13 +333,13 @@ export class GenericResourceQueryBuilder<
       this.baseUrl,
       this.executeFunction
     ) as this;
-    
+
     cloned.params = { ...this.params };
 
     // Deep clone array parameters
     const baseParams = this.params as BaseSearchParams;
     const clonedBaseParams = cloned.params as BaseSearchParams;
-    
+
     if (baseParams._include && Array.isArray(baseParams._include)) {
       clonedBaseParams._include = [...baseParams._include];
     }
@@ -332,14 +359,16 @@ export class GenericResourceQueryBuilder<
  */
 export function createResourceQueryBuilder<
   TResource extends FHIRResource = FHIRResource,
-  TSearchParams extends BaseSearchParams = BaseSearchParams
+  TSearchParams extends BaseSearchParams = BaseSearchParams,
 >(
   resourceType: string,
   baseUrl: string,
   executeFunction: (params: TSearchParams) => Promise<Bundle<TResource>>
 ): GenericResourceQueryBuilder<TResource, TSearchParams> {
   if (!defaultResourceFactory.isRegistered(resourceType)) {
-    throw new Error(`Resource type '${resourceType}' is not registered. Please register it first using ResourceFactory.register()`);
+    throw new Error(
+      `Resource type '${resourceType}' is not registered. Please register it first using ResourceFactory.register()`
+    );
   }
 
   return new GenericResourceQueryBuilder<TResource, TSearchParams>(

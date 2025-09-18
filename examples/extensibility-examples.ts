@@ -20,9 +20,10 @@ import {
   FHIRResponse,
   defaultResourceFactory,
   createResourceQueryBuilder,
-  PractitionerQueryBuilder
-} from '../src';
-import { FHIRResource, Bundle, BaseSearchParams } from '../src/types';
+  FHIRResource,
+  Bundle,
+  BaseSearchParams
+} from '../src/index';
 
 // Example 1: Creating a new resource type (Organization)
 
@@ -163,7 +164,6 @@ class CustomAuthPlugin implements FHIRPlugin {
     // Simulate token refresh API call
     console.log('Refreshing access token...');
     
-    // In a real implementation, you would make an HTTP request to your auth server
     // const response = await fetch('/auth/refresh', {
     //   method: 'POST',
     //   headers: { 'Content-Type': 'application/json' },
@@ -240,7 +240,6 @@ class ResponseCachePlugin implements FHIRPlugin {
 
     if (cached && Date.now() < cached.timestamp + cached.ttl) {
       // Return cached response by throwing a special error that contains the cached data
-      // In a real implementation, you'd need a way to short-circuit the request
       request.context = { ...request.context, cachedResponse: cached.data };
     }
 
@@ -305,7 +304,6 @@ class ExtendedFHIRClient extends FHIRClient {
     return new OrganizationQueryBuilder(
       this.getConfig().baseUrl,
       async (_params) => {
-        // In a real implementation, this would make an HTTP request
         // For now, return empty bundle
         return {
           resourceType: 'Bundle',
@@ -325,7 +323,6 @@ class ExtendedFHIRClient extends FHIRClient {
       resourceType,
       this.getConfig().baseUrl,
       async (_params) => {
-        // In a real implementation, this would make an HTTP request
         return {
           resourceType: 'Bundle',
           type: 'searchset',
@@ -569,5 +566,5 @@ export {
   CustomAuthPlugin,
   RateLimitPlugin,
   ResponseCachePlugin,
-  demonstrateExtensibility
+  demonstrateExtensibility as runExtensibilityExample
 };

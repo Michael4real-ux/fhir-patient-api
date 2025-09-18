@@ -31,7 +31,7 @@ export class CacheManager {
 
   constructor(config: CacheConfig) {
     this.config = config;
-    
+
     if (config.enabled) {
       this.initializeCaches();
     }
@@ -40,7 +40,10 @@ export class CacheManager {
   /**
    * Get cached response
    */
-  async get(key: string, _requestHeaders?: Record<string, string>): Promise<HttpResponse | null> {
+  async get(
+    key: string,
+    _requestHeaders?: Record<string, string>
+  ): Promise<HttpResponse | null> {
     if (!this.config.enabled) {
       return null;
     }
@@ -48,10 +51,10 @@ export class CacheManager {
     switch (this.config.strategy) {
       case 'lru':
         return this.lruCache?.get(key) || null;
-      
+
       case 'http':
         return this.httpCache?.get(key) || null;
-      
+
       case 'adaptive':
         // Try HTTP cache first, fallback to LRU
         const httpResult = this.httpCache?.get(key);
@@ -59,7 +62,7 @@ export class CacheManager {
           return httpResult;
         }
         return this.lruCache?.get(key) || null;
-      
+
       default:
         return null;
     }
@@ -68,7 +71,12 @@ export class CacheManager {
   /**
    * Store response in cache
    */
-  async set(key: string, response: HttpResponse, requestHeaders?: Record<string, string>, ttl?: number): Promise<void> {
+  async set(
+    key: string,
+    response: HttpResponse,
+    requestHeaders?: Record<string, string>,
+    ttl?: number
+  ): Promise<void> {
     if (!this.config.enabled) {
       return;
     }
@@ -77,11 +85,11 @@ export class CacheManager {
       case 'lru':
         this.lruCache?.set(key, response, ttl);
         break;
-      
+
       case 'http':
         this.httpCache?.set(key, response, requestHeaders);
         break;
-      
+
       case 'adaptive':
         // Store in both caches
         this.httpCache?.set(key, response, requestHeaders);
@@ -93,7 +101,10 @@ export class CacheManager {
   /**
    * Check if response can be served from cache
    */
-  canServeFromCache(key: string, requestHeaders?: Record<string, string>): boolean {
+  canServeFromCache(
+    key: string,
+    requestHeaders?: Record<string, string>
+  ): boolean {
     if (!this.config.enabled) {
       return false;
     }
@@ -101,19 +112,25 @@ export class CacheManager {
     switch (this.config.strategy) {
       case 'lru':
         return this.lruCache?.has(key) || false;
-      
+
       case 'http':
-        const validation = this.httpCache?.canServeFromCache(key, requestHeaders);
+        const validation = this.httpCache?.canServeFromCache(
+          key,
+          requestHeaders
+        );
         return validation?.isValid || false;
-      
+
       case 'adaptive':
         // Check both caches
-        const httpValidation = this.httpCache?.canServeFromCache(key, requestHeaders);
+        const httpValidation = this.httpCache?.canServeFromCache(
+          key,
+          requestHeaders
+        );
         if (httpValidation?.isValid) {
           return true;
         }
         return this.lruCache?.has(key) || false;
-      
+
       default:
         return false;
     }
@@ -164,11 +181,11 @@ export class CacheManager {
           }
         }
         break;
-      
+
       case 'http':
         invalidatedCount = this.httpCache?.invalidate(pattern) || 0;
         break;
-      
+
       case 'adaptive':
         // Invalidate from both caches
         invalidatedCount += this.httpCache?.invalidate(pattern) || 0;
@@ -234,9 +251,13 @@ export class CacheManager {
   /**
    * Generate cache key from URL and parameters
    */
-  static generateKey(url: string, params?: Record<string, any>, headers?: Record<string, string>): string {
+  static generateKey(
+    url: string,
+    params?: Record<string, any>,
+    headers?: Record<string, string>
+  ): string {
     let key = url;
-    
+
     if (params && Object.keys(params).length > 0) {
       const sortedParams = Object.keys(params)
         .sort()
@@ -252,7 +273,7 @@ export class CacheManager {
         .filter(h => headers[h])
         .map(h => `${h}:${headers[h]}`)
         .join('|');
-      
+
       if (headerParts) {
         key += `#${headerParts}`;
       }
@@ -273,7 +294,10 @@ export class CacheManager {
       });
     }
 
-    if (this.config.strategy === 'http' || this.config.strategy === 'adaptive') {
+    if (
+      this.config.strategy === 'http' ||
+      this.config.strategy === 'adaptive'
+    ) {
       const httpOptions: HttpCacheOptions = {
         maxSize: this.config.maxSize,
         maxEntries: this.config.maxEntries,
@@ -282,7 +306,7 @@ export class CacheManager {
         staleWhileRevalidate: this.config.staleWhileRevalidate,
         maxStaleTime: this.config.maxStaleTime,
       };
-      
+
       this.httpCache = new HttpCache(httpOptions);
     }
   }

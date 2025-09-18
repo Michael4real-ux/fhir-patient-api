@@ -98,7 +98,7 @@ export class CircuitBreaker {
     this.successCount++;
     this.totalRequests++;
     this.lastSuccessTime = Date.now();
-    
+
     this.addToHistory(true);
 
     // If we're in HALF_OPEN state and got a success, close the circuit
@@ -113,7 +113,7 @@ export class CircuitBreaker {
    */
   private onFailure(error: Error): void {
     this.totalRequests++;
-    
+
     // Only count failures for expected error types
     if (this.isExpectedError(error)) {
       this.failureCount++;
@@ -140,17 +140,19 @@ export class CircuitBreaker {
       if (!isInExpectedList) {
         return false;
       }
-      
+
       // For server errors, also check the status code
       if (error.code === 'FHIR_SERVER_ERROR') {
         const serverError = error as FHIRError & { statusCode?: number };
         if (serverError.statusCode) {
           // Only server errors (5xx) and rate limiting (429) should trigger circuit breaker
           // Client errors (4xx) should not trigger circuit breaker
-          return serverError.statusCode >= 500 || serverError.statusCode === 429;
+          return (
+            serverError.statusCode >= 500 || serverError.statusCode === 429
+          );
         }
       }
-      
+
       return true;
     }
 
@@ -202,7 +204,7 @@ export class CircuitBreaker {
   private calculateErrorPercentage(): number {
     const now = Date.now();
     const cutoff = now - this.config.monitoringPeriod;
-    
+
     const recentRequests = this.requestHistory.filter(
       req => req.timestamp > cutoff
     );
@@ -236,7 +238,7 @@ export class CircuitBreaker {
     if (this.state === CircuitState.OPEN) {
       const now = Date.now();
       const timeSinceStateChange = now - this.stateChangedAt;
-      
+
       if (timeSinceStateChange >= this.config.recoveryTimeout) {
         this.setState(CircuitState.HALF_OPEN);
       }

@@ -7,23 +7,23 @@
 
 import { FHIRClient } from '../client/fhir-client';
 import { Bundle } from '../types';
-import { 
-  PluginManager, 
-  LoggingPlugin, 
-  MetricsPlugin, 
+import {
+  PluginManager,
+  LoggingPlugin,
+  MetricsPlugin,
   RequestIdPlugin,
   FHIRPlugin,
-  FHIRRequest
+  FHIRRequest,
 } from './plugin-system';
-import { 
+import {
   defaultResourceFactory,
   createResourceQueryBuilder,
-  GenericResourceQueryBuilder
+  GenericResourceQueryBuilder,
 } from './resource-factory';
-import { 
-  PractitionerQueryBuilder, 
-  Practitioner, 
-  PractitionerSearchParams 
+import {
+  PractitionerQueryBuilder,
+  Practitioner,
+  PractitionerSearchParams,
 } from './examples/practitioner-query-builder';
 
 // Extended FHIR Client with plugin support
@@ -59,20 +59,23 @@ class ExtendedFHIRClient extends FHIRClient {
   /**
    * Create a query builder for any registered resource type
    */
-  resource<TResource extends import('../types').FHIRResource = any, TSearchParams extends import('../types').BaseSearchParams = any>(
+  resource<
+    TResource extends import('../types').FHIRResource = any,
+    TSearchParams extends import('../types').BaseSearchParams = any,
+  >(
     resourceType: string
   ): GenericResourceQueryBuilder<TResource, TSearchParams> {
     return createResourceQueryBuilder<TResource, TSearchParams>(
       resourceType,
       this.getConfig().baseUrl,
-      async (_params) => {
+      async _params => {
         // This would normally make an HTTP request through the client
         // For testing, we'll mock this
         return {
           resourceType: 'Bundle',
           type: 'searchset',
           total: 0,
-          entry: []
+          entry: [],
         } as Bundle<TResource>;
       }
     );
@@ -91,7 +94,7 @@ class ExtendedFHIRClient extends FHIRClient {
           resourceType: 'Bundle',
           type: 'searchset',
           total: 0,
-          entry: []
+          entry: [],
         } as Bundle<Practitioner>;
       }
     );
@@ -112,7 +115,7 @@ describe('Extensibility Framework Integration', () => {
   beforeEach(() => {
     client = new ExtendedFHIRClient({
       baseUrl: 'https://example.com/fhir',
-      auth: { type: 'none' }
+      auth: { type: 'none' },
     });
   });
 
@@ -126,12 +129,12 @@ describe('Extensibility Framework Integration', () => {
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       };
 
       const loggingPlugin = new LoggingPlugin({
         logger: mockLogger,
-        logLevel: 'info'
+        logLevel: 'info',
       });
 
       await client.use(loggingPlugin);
@@ -174,7 +177,7 @@ describe('Extensibility Framework Integration', () => {
         name: 'test-plugin',
         onInstall,
         onUninstall,
-        onDestroy
+        onDestroy,
       };
 
       await client.use(testPlugin);
@@ -196,7 +199,7 @@ describe('Extensibility Framework Integration', () => {
           resourceType: 'Practitioner',
           searchParameters: ['name', 'specialty', 'active'],
           sortFields: ['name', '_id'],
-          queryBuilderClass: PractitionerQueryBuilder
+          queryBuilderClass: PractitionerQueryBuilder,
         });
       }
     });
@@ -221,8 +224,10 @@ describe('Extensibility Framework Integration', () => {
           constructor(baseUrl: string, executeFunction: any) {
             super('TestResource', baseUrl, executeFunction);
           }
-          clone() { return this; }
-        }
+          clone() {
+            return this;
+          }
+        },
       });
 
       const testBuilder = client.resource('TestResource');
@@ -231,18 +236,19 @@ describe('Extensibility Framework Integration', () => {
 
     it('should validate parameters using factory', () => {
       const practitionerBuilder = client.practitioners();
-      
+
       // This should work
       practitionerBuilder.where('name', 'Dr. Smith');
-      
+
       // This should fail validation
-      expect(() => practitionerBuilder.where('invalid-field' as any, 'value'))
-        .toThrow();
+      expect(() =>
+        practitionerBuilder.where('invalid-field' as any, 'value')
+      ).toThrow();
     });
 
     it('should support resource-specific methods', () => {
       const practitionerBuilder = client.practitioners();
-      
+
       practitionerBuilder.whereSpecialty('cardiology');
       practitionerBuilder.whereQualification('MD');
       practitionerBuilder.whereActive(true);
@@ -259,7 +265,7 @@ describe('Extensibility Framework Integration', () => {
       // Set up plugins
       const metricsPlugin = new MetricsPlugin();
       const requestIdPlugin = new RequestIdPlugin();
-      
+
       await client.use(metricsPlugin);
       await client.use(requestIdPlugin);
 
@@ -286,7 +292,7 @@ describe('Extensibility Framework Integration', () => {
     it('should handle errors with plugin error handling', async () => {
       const errorHandlerPlugin: FHIRPlugin = {
         name: 'error-handler',
-        onError: jest.fn().mockImplementation((error) => Promise.resolve(error))
+        onError: jest.fn().mockImplementation(error => Promise.resolve(error)),
       };
 
       await client.use(errorHandlerPlugin);
@@ -296,7 +302,10 @@ describe('Extensibility Framework Integration', () => {
 
       await pluginManager.executeOnError(testError);
 
-      expect(errorHandlerPlugin.onError).toHaveBeenCalledWith(testError, undefined);
+      expect(errorHandlerPlugin.onError).toHaveBeenCalledWith(
+        testError,
+        undefined
+      );
     });
   });
 
@@ -305,7 +314,7 @@ describe('Extensibility Framework Integration', () => {
       // Custom plugin that adds authentication headers
       class AuthPlugin implements FHIRPlugin {
         name = 'custom-auth';
-        
+
         constructor(private token: string) {}
 
         async beforeRequest(request: FHIRRequest): Promise<FHIRRequest> {
@@ -313,8 +322,8 @@ describe('Extensibility Framework Integration', () => {
             ...request,
             headers: {
               ...request.headers,
-              'Authorization': `Bearer ${this.token}`
-            }
+              Authorization: `Bearer ${this.token}`,
+            },
           };
         }
       }
@@ -326,7 +335,7 @@ describe('Extensibility Framework Integration', () => {
       const testRequest: FHIRRequest = {
         method: 'GET',
         url: 'https://example.com/Patient',
-        headers: {}
+        headers: {},
       };
 
       const result = await pluginManager.executeBeforeRequest(testRequest);
@@ -339,18 +348,18 @@ describe('Extensibility Framework Integration', () => {
 
       const plugin1: FHIRPlugin = {
         name: 'plugin1',
-        beforeRequest: async (req) => {
+        beforeRequest: async req => {
           executionOrder.push('plugin1');
           return { ...req, context: { ...req.context, plugin1: true } };
-        }
+        },
       };
 
       const plugin2: FHIRPlugin = {
         name: 'plugin2',
-        beforeRequest: async (req) => {
+        beforeRequest: async req => {
           executionOrder.push('plugin2');
           return { ...req, context: { ...req.context, plugin2: true } };
-        }
+        },
       };
 
       await client.use(plugin1);
@@ -359,7 +368,7 @@ describe('Extensibility Framework Integration', () => {
       const pluginManager = client.getPluginManager();
       const testRequest: FHIRRequest = {
         method: 'GET',
-        url: 'https://example.com/Patient'
+        url: 'https://example.com/Patient',
       };
 
       const result = await pluginManager.executeBeforeRequest(testRequest);
@@ -375,7 +384,7 @@ describe('Extensibility Framework Integration', () => {
       const onDestroy = jest.fn();
       const testPlugin: FHIRPlugin = {
         name: 'cleanup-test',
-        onDestroy
+        onDestroy,
       };
 
       await client.use(testPlugin);
@@ -390,11 +399,11 @@ describe('Extensibility Framework Integration', () => {
 
       // Simulate some requests
       const pluginManager = client.getPluginManager();
-      
+
       await pluginManager.executeBeforeRequest({
         method: 'GET',
         url: 'https://example.com/Patient',
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       await pluginManager.executeAfterResponse({
@@ -402,7 +411,7 @@ describe('Extensibility Framework Integration', () => {
         status: 200,
         statusText: 'OK',
         headers: {},
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       const metrics = metricsPlugin.getMetrics();

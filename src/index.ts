@@ -59,5 +59,18 @@ export async function getPatientById(
   return client.getPatientById(id);
 }
 
+/**
+ * Simple function to search for patients with specific criteria
+ * @param client - Configured FHIR client
+ * @param params - Search parameters
+ * @returns Promise resolving to a Bundle of Patient resources
+ */
+export async function searchPatients(
+  client: FHIRClient, 
+  params: PatientSearchParams
+): Promise<Bundle<Patient>> {
+  return client.searchPatients(params);
+}
+
 // Version information
 export const VERSION = '1.0.0';

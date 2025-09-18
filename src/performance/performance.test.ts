@@ -65,9 +65,9 @@ describe('Performance Tests', () => {
       const operations = 2000; // More than cache can hold
 
       for (let i = 0; i < operations; i++) {
-        cache.set(`key-${i}`, { 
-          id: i, 
-          data: `test-data-${i}`.repeat(100) // Large data to force evictions
+        cache.set(`key-${i}`, {
+          id: i,
+          data: `test-data-${i}`.repeat(100), // Large data to force evictions
         });
       }
 
@@ -81,7 +81,7 @@ describe('Performance Tests', () => {
 
     test('should have efficient memory usage', async () => {
       const initialMemory = process.memoryUsage().heapUsed;
-      
+
       // Add 1000 entries
       for (let i = 0; i < 1000; i++) {
         cache.set(`key-${i}`, { id: i, data: `test-data-${i}`.repeat(10) });
@@ -92,7 +92,7 @@ describe('Performance Tests', () => {
 
       // Clear cache
       cache.clear();
-      
+
       // Force garbage collection if available
       if (global.gc) {
         global.gc();
@@ -107,7 +107,7 @@ describe('Performance Tests', () => {
       // Memory should be managed efficiently - check that we don't leak too much
       expect(memoryIncrease).toBeGreaterThan(0); // Should have used some memory
       expect(cache.getStats().currentEntries).toBe(0); // Should be empty after clear
-      
+
       // Memory recovery is not guaranteed due to GC behavior, so just check cache is empty
       expect(cache.length()).toBe(0);
     });
@@ -140,7 +140,7 @@ describe('Performance Tests', () => {
           statusText: 'OK',
           headers: {
             'cache-control': 'max-age=300',
-            'etag': `"etag-${i}"`,
+            etag: `"etag-${i}"`,
           },
         };
         cache.set(`key-${i}`, response);
@@ -163,7 +163,7 @@ describe('Performance Tests', () => {
           statusText: 'OK',
           headers: {
             'cache-control': 'max-age=300',
-            'etag': `"etag-${i}"`,
+            etag: `"etag-${i}"`,
             'last-modified': new Date().toUTCString(),
           },
         };
@@ -216,10 +216,10 @@ describe('Performance Tests', () => {
           statusText: 'OK',
           headers: {
             'cache-control': 'max-age=300',
-            'etag': `"etag-${i}"`,
+            etag: `"etag-${i}"`,
           },
         };
-        
+
         await cacheManager.set(`key-${i}`, response);
         await cacheManager.get(`key-${i}`);
       }
@@ -293,13 +293,13 @@ describe('Performance Tests', () => {
 
     test('should maintain performance statistics', () => {
       const stats = connectionPool.getStats();
-      
+
       expect(stats).toHaveProperty('totalConnections');
       expect(stats).toHaveProperty('activeConnections');
       expect(stats).toHaveProperty('idleConnections');
       expect(stats).toHaveProperty('requestsServed');
       expect(stats).toHaveProperty('averageResponseTime');
-      
+
       expect(typeof stats.totalConnections).toBe('number');
       expect(typeof stats.averageResponseTime).toBe('number');
     });
@@ -314,7 +314,7 @@ describe('Performance Tests', () => {
 
     test('should run cache benchmarks successfully', async () => {
       const suite = await benchmark.runCacheBenchmarks();
-      
+
       expect(suite.name).toBe('Cache Performance');
       expect(suite.results).toHaveLength(7); // All cache benchmark methods
       expect(suite.totalDuration).toBeGreaterThan(0);
@@ -324,7 +324,7 @@ describe('Performance Tests', () => {
 
     test('should provide meaningful performance metrics', async () => {
       const suite = await benchmark.runCacheBenchmarks();
-      
+
       for (const result of suite.results) {
         expect(result.name).toBeTruthy();
         expect(result.duration).toBeGreaterThanOrEqual(0);
@@ -338,33 +338,33 @@ describe('Performance Tests', () => {
   describe('Memory Efficiency', () => {
     test('should not leak memory during cache operations', async () => {
       const initialMemory = process.memoryUsage().heapUsed;
-      
+
       // Create and destroy multiple caches
       for (let i = 0; i < 10; i++) {
         const cache = new LRUCache({
           maxSize: 100 * 1024, // 100KB
           defaultTTL: 60000,
         });
-        
+
         // Add some data
         for (let j = 0; j < 100; j++) {
           cache.set(`key-${j}`, { data: `test-${j}` });
         }
-        
+
         cache.destroy();
       }
-      
+
       // Force garbage collection if available
       if (global.gc) {
         global.gc();
       }
-      
+
       // Wait a bit for cleanup
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       const finalMemory = process.memoryUsage().heapUsed;
       const memoryIncrease = finalMemory - initialMemory;
-      
+
       // Memory increase should be minimal (less than 1MB)
       expect(memoryIncrease).toBeLessThan(1024 * 1024);
     });
@@ -377,8 +377,8 @@ describe('Performance Tests', () => {
 
       // Try to add 10MB of data (should trigger evictions)
       for (let i = 0; i < 1000; i++) {
-        cache.set(`key-${i}`, { 
-          data: 'x'.repeat(10 * 1024) // 10KB per entry
+        cache.set(`key-${i}`, {
+          data: 'x'.repeat(10 * 1024), // 10KB per entry
         });
       }
 

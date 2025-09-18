@@ -6,17 +6,24 @@
  * beyond Patient.
  */
 
-import { FHIRResource, Bundle, BaseSearchParams, ValidationResult } from '../types';
+import {
+  FHIRResource,
+  Bundle,
+  BaseSearchParams,
+  ValidationResult,
+} from '../types';
 import { FHIRValidationError } from '../errors';
 import { QueryBuilder } from '../utils/query-builder';
 
 export abstract class BaseResourceQueryBuilder<
   TResource extends FHIRResource,
-  TSearchParams extends BaseSearchParams = BaseSearchParams
+  TSearchParams extends BaseSearchParams = BaseSearchParams,
 > {
   protected params: TSearchParams = {} as TSearchParams;
   protected baseUrl: string;
-  protected executeFunction: (params: TSearchParams) => Promise<Bundle<TResource>>;
+  protected executeFunction: (
+    params: TSearchParams
+  ) => Promise<Bundle<TResource>>;
 
   /**
    * The FHIR resource type this builder handles (e.g., 'Patient', 'Practitioner')
@@ -66,7 +73,10 @@ export abstract class BaseResourceQueryBuilder<
    */
   sort(field: string, direction: 'asc' | 'desc' = 'asc'): this {
     if (!field || typeof field !== 'string') {
-      throw new FHIRValidationError('Sort field is required and must be a string', '_sort');
+      throw new FHIRValidationError(
+        'Sort field is required and must be a string',
+        '_sort'
+      );
     }
 
     const trimmedField = field.trim();
@@ -101,16 +111,23 @@ export abstract class BaseResourceQueryBuilder<
    */
   include(resource: string): this {
     if (!resource || typeof resource !== 'string') {
-      throw new FHIRValidationError('Include resource is required and must be a string', '_include');
+      throw new FHIRValidationError(
+        'Include resource is required and must be a string',
+        '_include'
+      );
     }
 
     const trimmedResource = resource.trim();
     if (trimmedResource.length === 0) {
-      throw new FHIRValidationError('Include resource cannot be empty', '_include');
+      throw new FHIRValidationError(
+        'Include resource cannot be empty',
+        '_include'
+      );
     }
 
     // Validate include format (should be ResourceType:field or ResourceType:field:target)
-    const includePattern = /^[A-Z][a-zA-Z]*:[a-zA-Z][a-zA-Z0-9-]*(:([A-Z][a-zA-Z]*))?$/;
+    const includePattern =
+      /^[A-Z][a-zA-Z]*:[a-zA-Z][a-zA-Z0-9-]*(:([A-Z][a-zA-Z]*))?$/;
     if (!includePattern.test(trimmedResource)) {
       throw new FHIRValidationError(
         `Invalid include format: ${trimmedResource}. Expected format: ResourceType:field or ResourceType:field:target`,
@@ -125,7 +142,10 @@ export abstract class BaseResourceQueryBuilder<
         currentIncludes.push(trimmedResource);
       }
     } else if (currentIncludes) {
-      (this.params as BaseSearchParams)._include = [currentIncludes, trimmedResource];
+      (this.params as BaseSearchParams)._include = [
+        currentIncludes,
+        trimmedResource,
+      ];
     } else {
       (this.params as BaseSearchParams)._include = [trimmedResource];
     }
@@ -154,24 +174,39 @@ export abstract class BaseResourceQueryBuilder<
    */
   elements(elements: string | string[]): this {
     if (!elements) {
-      throw new FHIRValidationError('Elements parameter is required', '_elements');
+      throw new FHIRValidationError(
+        'Elements parameter is required',
+        '_elements'
+      );
     }
 
     const elementArray = Array.isArray(elements) ? elements : [elements];
 
     // Check for empty array
     if (elementArray.length === 0) {
-      throw new FHIRValidationError('Elements array cannot be empty', '_elements');
+      throw new FHIRValidationError(
+        'Elements array cannot be empty',
+        '_elements'
+      );
     }
 
     // Validate each element
     elementArray.forEach(element => {
-      if (!element || typeof element !== 'string' || element.trim().length === 0) {
-        throw new FHIRValidationError('Each element must be a non-empty string', '_elements');
+      if (
+        !element ||
+        typeof element !== 'string' ||
+        element.trim().length === 0
+      ) {
+        throw new FHIRValidationError(
+          'Each element must be a non-empty string',
+          '_elements'
+        );
       }
     });
 
-    (this.params as BaseSearchParams)._elements = elementArray.map(e => e.trim());
+    (this.params as BaseSearchParams)._elements = elementArray.map(e =>
+      e.trim()
+    );
     return this;
   }
 
@@ -228,18 +263,21 @@ export abstract class BaseResourceQueryBuilder<
   /**
    * Execute the query and return an async iterator for streaming results
    */
-  async* stream(options?: {
+  async *stream(options?: {
     pageSize?: number;
     maxConcurrency?: number;
     memoryLimit?: number;
     onProgress?: (processed: number, total?: number) => void;
   }): AsyncIterable<TResource> {
     const {
-      pageSize = 50,
       maxConcurrency = 1,
       memoryLimit = 100 * 1024 * 1024, // 100MB default
-      onProgress
+      onProgress,
     } = options || {};
+
+    // Use existing _count parameter if set, otherwise use pageSize option or default
+    const existingCount = (this.params as BaseSearchParams)._count;
+    const pageSize = options?.pageSize || existingCount || 50;
 
     // Validate streaming options
     if (pageSize <= 0 || pageSize > 1000) {
@@ -310,12 +348,14 @@ export abstract class BaseResourceQueryBuilder<
 
         // Check if there are more results
         const returnedCount = bundle.entry.length;
-        
-        if (returnedCount < pageSize) {
-          hasMoreResults = false;
-        } else if (bundle.total !== undefined) {
+
+        // Determine if there are more results based on total count or returned count
+        if (bundle.total !== undefined) {
           const totalExpected = bundle.total;
-          hasMoreResults = (startingOffset + totalProcessed) < totalExpected;
+          hasMoreResults = startingOffset + totalProcessed < totalExpected;
+        } else {
+          // If no total count, use returned count to determine if more results exist
+          hasMoreResults = returnedCount >= pageSize;
         }
 
         // Move to next page
@@ -340,7 +380,7 @@ export abstract class BaseResourceQueryBuilder<
       pageSize = 50,
       maxConcurrency = 3,
       maxResults = 10000,
-      onProgress
+      onProgress,
     } = options || {};
 
     // Validate options
@@ -367,13 +407,13 @@ export abstract class BaseResourceQueryBuilder<
 
     const results: TResource[] = [];
 
-    for await (const resource of this.stream({ 
-      pageSize, 
-      maxConcurrency, 
-      onProgress
+    for await (const resource of this.stream({
+      pageSize,
+      maxConcurrency,
+      onProgress,
     })) {
       results.push(resource);
-      
+
       // Check max results limit
       if (results.length >= maxResults) {
         break;
@@ -404,7 +444,11 @@ export abstract class BaseResourceQueryBuilder<
       );
     }
 
-    return QueryBuilder.buildSearchUrl(this.baseUrl, this.resourceType, this.params);
+    return QueryBuilder.buildSearchUrl(
+      this.baseUrl,
+      this.resourceType,
+      this.params
+    );
   }
 
   /**
@@ -439,31 +483,53 @@ export abstract class BaseResourceQueryBuilder<
   /**
    * Add a generic where clause - subclasses should provide type-safe versions
    */
-  protected addWhereClause(field: string, value: string | number | boolean): this {
+  protected addWhereClause(
+    field: string,
+    value: string | number | boolean
+  ): this {
     if (!field) {
-      throw new FHIRValidationError('Field name is required for where clause', 'field');
+      throw new FHIRValidationError(
+        'Field name is required for where clause',
+        'field'
+      );
     }
 
     if (value === undefined || value === null) {
-      throw new FHIRValidationError('Value is required for where clause', 'value');
+      throw new FHIRValidationError(
+        'Value is required for where clause',
+        'value'
+      );
     }
 
     // Convert value to string and validate
     const stringValue = String(value).trim();
     if (stringValue.length === 0) {
-      throw new FHIRValidationError('Value cannot be empty or only whitespace', 'value');
+      throw new FHIRValidationError(
+        'Value cannot be empty or only whitespace',
+        'value'
+      );
     }
 
     // Handle multiple values for the same field (OR logic)
     const existingValue = (this.params as Record<string, unknown>)[field];
     if (existingValue !== undefined) {
       // For array fields like _include, append to array
-      if (field === '_include' || field === '_revinclude' || field === '_elements') {
-        const currentArray = Array.isArray(existingValue) ? existingValue : [String(existingValue)];
-        (this.params as unknown as Record<string, string | string[]>)[field] = [...currentArray, stringValue];
+      if (
+        field === '_include' ||
+        field === '_revinclude' ||
+        field === '_elements'
+      ) {
+        const currentArray = Array.isArray(existingValue)
+          ? existingValue
+          : [String(existingValue)];
+        (this.params as unknown as Record<string, string | string[]>)[field] = [
+          ...currentArray,
+          stringValue,
+        ];
       } else {
         // For other fields, create comma-separated values (FHIR OR logic)
-        (this.params as unknown as Record<string, string>)[field] = `${existingValue},${stringValue}`;
+        (this.params as unknown as Record<string, string>)[field] =
+          `${existingValue},${stringValue}`;
       }
     } else {
       (this.params as unknown as Record<string, string>)[field] = stringValue;

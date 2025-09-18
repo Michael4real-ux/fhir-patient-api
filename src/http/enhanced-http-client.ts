@@ -2,10 +2,20 @@
  * Enhanced HTTP Client with caching and connection pooling
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import http2 from 'http2';
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
+import * as http2 from 'http2';
 import { HttpResponse, RequestConfig, OperationOutcome } from '../types';
-import { FHIRNetworkError, FHIRServerError, RateLimitError, ErrorContext } from '../errors';
+import {
+  FHIRNetworkError,
+  FHIRServerError,
+  RateLimitError,
+  ErrorContext,
+} from '../errors';
 import { ResilienceManager } from '../utils/resilience-manager';
 import { CacheManager, CacheConfig } from '../cache/cache-manager';
 import { ConnectionPool, ConnectionPoolOptions } from './connection-pool';
@@ -39,7 +49,7 @@ export class EnhancedHttpClient {
 
   constructor(options: EnhancedHttpClientOptions) {
     this.baseURL = options.baseURL;
-    
+
     // Initialize connection pool
     this.connectionPool = new ConnectionPool(options.connectionPool);
 
@@ -49,20 +59,22 @@ export class EnhancedHttpClient {
     }
 
     // Initialize resilience manager
-    this.resilienceManager = options.resilience || new ResilienceManager({
-      retry: {
-        maxAttempts: 3,
-        baseDelay: 1000,
-        maxDelay: 10000,
-        jitterType: 'full',
-      },
-      circuitBreaker: {
-        failureThreshold: 5,
-        recoveryTimeout: 30000,
-        volumeThreshold: 10,
-        errorPercentageThreshold: 50,
-      },
-    });
+    this.resilienceManager =
+      options.resilience ||
+      new ResilienceManager({
+        retry: {
+          maxAttempts: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          jitterType: 'full',
+        },
+        circuitBreaker: {
+          failureThreshold: 5,
+          recoveryTimeout: 30000,
+          volumeThreshold: 10,
+          errorPercentageThreshold: 50,
+        },
+      });
 
     // Create axios instance with custom adapter for connection pooling
     this.axiosInstance = axios.create({
@@ -77,14 +89,14 @@ export class EnhancedHttpClient {
 
     // Add request interceptor for caching and metrics
     this.axiosInstance.interceptors.request.use(
-      (config) => this.handleRequest(config as InternalAxiosRequestConfig),
-      (error) => Promise.reject(error)
+      config => this.handleRequest(config as InternalAxiosRequestConfig),
+      error => Promise.reject(error)
     );
 
     // Add response interceptor for caching and error handling
     this.axiosInstance.interceptors.response.use(
-      (response) => this.handleResponse(response),
-      (error) => this.handleError(error)
+      response => this.handleResponse(response),
+      error => this.handleError(error)
     );
   }
 
@@ -94,7 +106,7 @@ export class EnhancedHttpClient {
   async request<T = unknown>(config: RequestConfig): Promise<HttpResponse<T>> {
     const requestId = this.generateRequestId();
     const startTime = Date.now();
-    
+
     // Initialize metrics
     this.requestMetrics.set(requestId, {
       startTime,
@@ -115,30 +127,40 @@ export class EnhancedHttpClient {
       return await this.resilienceManager.execute(async () => {
         // Check cache first
         if (this.cacheManager && config.method === 'GET') {
-          const cacheKey = CacheManager.generateKey(config.url!, config.params, config.headers);
-          
+          const cacheKey = CacheManager.generateKey(
+            config.url!,
+            config.params,
+            config.headers
+          );
+
           // Try to serve from cache
           if (this.cacheManager.canServeFromCache(cacheKey, config.headers)) {
-            const cachedResponse = await this.cacheManager.get(cacheKey, config.headers);
+            const cachedResponse = await this.cacheManager.get(
+              cacheKey,
+              config.headers
+            );
             if (cachedResponse) {
               const metrics = this.requestMetrics.get(requestId)!;
               metrics.cacheHit = true;
               metrics.endTime = Date.now();
               metrics.duration = metrics.endTime - metrics.startTime;
-              
+
               return cachedResponse as HttpResponse<T>;
             }
           }
 
           // Add conditional headers if available
-          const validationHeaders = this.cacheManager.getValidationHeaders(cacheKey);
+          const validationHeaders =
+            this.cacheManager.getValidationHeaders(cacheKey);
           if (Object.keys(validationHeaders).length > 0) {
             config.headers = { ...config.headers, ...validationHeaders };
           }
         }
 
         // Make actual request
-        const axiosConfig: AxiosRequestConfig & { metadata?: { requestId: string } } = {
+        const axiosConfig: AxiosRequestConfig & {
+          metadata?: { requestId: string };
+        } = {
           method: config.method,
           url: config.url,
           headers: config.headers,
@@ -149,7 +171,7 @@ export class EnhancedHttpClient {
         };
 
         const response = await this.axiosInstance.request<T>(axiosConfig);
-        
+
         const httpResponse: HttpResponse<T> = {
           data: response.data,
           status: response.status,
@@ -158,19 +180,39 @@ export class EnhancedHttpClient {
         };
 
         // Handle 304 Not Modified
-        if (response.status === 304 && this.cacheManager && config.method === 'GET') {
-          const cacheKey = CacheManager.generateKey(config.url!, config.params, config.headers);
+        if (
+          response.status === 304 &&
+          this.cacheManager &&
+          config.method === 'GET'
+        ) {
+          const cacheKey = CacheManager.generateKey(
+            config.url!,
+            config.params,
+            config.headers
+          );
           this.cacheManager.updateFromNotModified(cacheKey, httpResponse);
-          
-          const cachedResponse = await this.cacheManager.get(cacheKey, config.headers);
+
+          const cachedResponse = await this.cacheManager.get(
+            cacheKey,
+            config.headers
+          );
           if (cachedResponse) {
             return cachedResponse as HttpResponse<T>;
           }
         }
 
         // Cache successful GET responses
-        if (this.cacheManager && config.method === 'GET' && response.status >= 200 && response.status < 300) {
-          const cacheKey = CacheManager.generateKey(config.url!, config.params, config.headers);
+        if (
+          this.cacheManager &&
+          config.method === 'GET' &&
+          response.status >= 200 &&
+          response.status < 300
+        ) {
+          const cacheKey = CacheManager.generateKey(
+            config.url!,
+            config.params,
+            config.headers
+          );
           await this.cacheManager.set(cacheKey, httpResponse, config.headers);
         }
 
@@ -183,7 +225,7 @@ export class EnhancedHttpClient {
         metrics.endTime = Date.now();
         metrics.duration = metrics.endTime - metrics.startTime;
       }
-      
+
       // Record request in connection pool
       if (metrics?.duration) {
         this.connectionPool.recordRequest(metrics.duration);
@@ -239,14 +281,22 @@ export class EnhancedHttpClient {
   /**
    * Handle request interceptor
    */
-  private async handleRequest(config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> {
-    const requestId = (config as InternalAxiosRequestConfig & { metadata?: { requestId: string } }).metadata?.requestId;
-    
+  private async handleRequest(
+    config: InternalAxiosRequestConfig
+  ): Promise<InternalAxiosRequestConfig> {
+    const requestId = (
+      config as InternalAxiosRequestConfig & {
+        metadata?: { requestId: string };
+      }
+    ).metadata?.requestId;
+
     // Get connection for this request
     if (config.url) {
-      const fullUrl = config.url.startsWith('http') ? config.url : `${this.baseURL}${config.url}`;
+      const fullUrl = config.url.startsWith('http')
+        ? config.url
+        : `${this.baseURL}${config.url}`;
       const connection = await this.connectionPool.getConnection(fullUrl);
-      
+
       // Update metrics
       if (requestId) {
         const metrics = this.requestMetrics.get(requestId);
@@ -276,8 +326,12 @@ export class EnhancedHttpClient {
    * Handle response interceptor
    */
   private handleResponse(response: AxiosResponse): AxiosResponse {
-    const requestId = (response.config as AxiosRequestConfig & { metadata?: { requestId: string } }).metadata?.requestId;
-    
+    const requestId = (
+      response.config as AxiosRequestConfig & {
+        metadata?: { requestId: string };
+      }
+    ).metadata?.requestId;
+
     // Update metrics
     if (requestId) {
       const metrics = this.requestMetrics.get(requestId);
@@ -294,7 +348,7 @@ export class EnhancedHttpClient {
    * Handle error interceptor
    */
   private handleError(error: unknown): Promise<never> {
-    const errorObj = error as { 
+    const errorObj = error as {
       config?: { metadata?: { requestId?: string } };
       response?: {
         status: number;
@@ -304,9 +358,9 @@ export class EnhancedHttpClient {
       };
       message?: string;
     };
-    
+
     const requestId = errorObj.config?.metadata?.requestId;
-    
+
     // Update metrics
     if (requestId) {
       const metrics = this.requestMetrics.get(requestId);
@@ -327,11 +381,13 @@ export class EnhancedHttpClient {
 
     if (errorObj.response) {
       const status = errorObj.response.status;
-      
+
       if (status === 429) {
         const retryAfter = errorObj.response.headers['retry-after'];
-        const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined;
-        
+        const retryAfterSeconds = retryAfter
+          ? parseInt(retryAfter, 10)
+          : undefined;
+
         throw new RateLimitError(
           'Rate limit exceeded',
           retryAfterSeconds,
@@ -342,7 +398,9 @@ export class EnhancedHttpClient {
       throw new FHIRServerError(
         `HTTP ${status}: ${errorObj.response.statusText}`,
         status,
-        errorObj.response.data?.resourceType === 'OperationOutcome' ? errorObj.response.data as OperationOutcome : undefined,
+        errorObj.response.data?.resourceType === 'OperationOutcome'
+          ? (errorObj.response.data as OperationOutcome)
+          : undefined,
         context,
         errorObj.message
       );
@@ -366,24 +424,24 @@ export class EnhancedHttpClient {
           ':method': config.method?.toUpperCase() || 'GET',
           ':path': config.url || '/',
         };
-        
+
         // Add other headers
         if (config.headers && typeof config.headers === 'object') {
           Object.assign(headers, config.headers);
         }
 
         const req = session.request(headers);
-        
+
         let responseData = '';
         let responseHeaders: Record<string, any> = {};
         let status = 200;
 
-        req.on('response', (headers) => {
+        req.on('response', headers => {
           responseHeaders = headers;
-          status = headers[':status'] as number || 200;
+          status = (headers[':status'] as number) || 200;
         });
 
-        req.on('data', (chunk) => {
+        req.on('data', chunk => {
           responseData += chunk;
         });
 
@@ -407,9 +465,13 @@ export class EnhancedHttpClient {
 
         // Send data if present
         if (config.data) {
-          req.write(typeof config.data === 'string' ? config.data : JSON.stringify(config.data));
+          req.write(
+            typeof config.data === 'string'
+              ? config.data
+              : JSON.stringify(config.data)
+          );
         }
-        
+
         req.end();
       });
     };
@@ -434,7 +496,7 @@ export class EnhancedHttpClient {
       503: 'Service Unavailable',
       504: 'Gateway Timeout',
     };
-    
+
     return statusTexts[status] || 'Unknown';
   }
 

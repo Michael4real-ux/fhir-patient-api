@@ -6,7 +6,11 @@
  */
 
 import { RetryManager, RetryConfig } from './retry-manager';
-import { CircuitBreaker, CircuitBreakerConfig, CircuitState } from './circuit-breaker';
+import {
+  CircuitBreaker,
+  CircuitBreakerConfig,
+  CircuitState,
+} from './circuit-breaker';
 import { ErrorContext, FHIRError, RateLimitError } from '../errors';
 
 export interface ResilienceConfig {
@@ -38,11 +42,11 @@ export class ResilienceManager {
   private retryManager: RetryManager;
   private circuitBreaker: CircuitBreaker;
   private config: ResilienceConfig;
-  
+
   // Rate limiting state
   private requestTimestamps: number[] = [];
   private totalRateLimitedRequests = 0;
-  
+
   // Statistics
   private totalRetries = 0;
   private successAfterRetry = 0;
@@ -77,30 +81,32 @@ export class ResilienceManager {
 
     // Execute with circuit breaker and retry logic
     const enhancedContext = { ...context };
-    
+
     return this.circuitBreaker.execute(async () => {
       try {
         const result = await this.retryManager.execute(fn, enhancedContext);
-        
+
         // Check if we succeeded after retries
-        const contextWithRetries = enhancedContext as Partial<ErrorContext> & { succeededAfterRetries?: number };
+        const contextWithRetries = enhancedContext as Partial<ErrorContext> & {
+          succeededAfterRetries?: number;
+        };
         if (contextWithRetries.succeededAfterRetries) {
           this.successAfterRetry++;
           this.totalRetries += contextWithRetries.succeededAfterRetries;
         }
-        
+
         return result;
       } catch (error) {
         // Check if retry was attempted by looking at error context
         if (error instanceof FHIRError && error.context?.retryAttempt) {
           const retryAttempts = error.context.retryAttempt - 1;
           this.totalRetries += retryAttempts;
-          
+
           if (retryAttempts > 0) {
             this.failedAfterAllRetries++;
           }
         }
-        
+
         throw error;
       }
     }, enhancedContext);
@@ -112,20 +118,23 @@ export class ResilienceManager {
   private async applyRateLimit(): Promise<void> {
     const now = Date.now();
     const oneSecondAgo = now - 1000;
-    
+
     // Clean up old timestamps
     this.requestTimestamps = this.requestTimestamps.filter(
       timestamp => timestamp > oneSecondAgo
     );
-    
+
     // Check if we're within rate limits
-    if (this.requestTimestamps.length >= this.config.rateLimiting.maxRequestsPerSecond) {
+    if (
+      this.requestTimestamps.length >=
+      this.config.rateLimiting.maxRequestsPerSecond
+    ) {
       this.totalRateLimitedRequests++;
-      
+
       // Calculate delay until we can make the next request
       const oldestRequest = Math.min(...this.requestTimestamps);
       const delay = 1000 - (now - oldestRequest);
-      
+
       if (delay > 0) {
         throw new RateLimitError(
           'Rate limit exceeded',
@@ -139,7 +148,7 @@ export class ResilienceManager {
         );
       }
     }
-    
+
     // Record this request
     this.requestTimestamps.push(now);
   }
@@ -153,7 +162,7 @@ export class ResilienceManager {
     context?: Partial<ErrorContext>
   ): Promise<T> {
     const customRetryManager = new RetryManager(retryConfig);
-    
+
     return this.circuitBreaker.execute(async () => {
       return customRetryManager.execute(fn, context);
     }, context);
@@ -235,7 +244,10 @@ export class ResilienceManager {
   updateConfig(config: Partial<ResilienceConfig>): void {
     this.config = {
       retry: { ...this.config.retry, ...config.retry },
-      circuitBreaker: { ...this.config.circuitBreaker, ...config.circuitBreaker },
+      circuitBreaker: {
+        ...this.config.circuitBreaker,
+        ...config.circuitBreaker,
+      },
       rateLimiting: { ...this.config.rateLimiting, ...config.rateLimiting },
     };
 

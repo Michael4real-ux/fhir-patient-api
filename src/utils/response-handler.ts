@@ -72,10 +72,7 @@ export class ResponseHandler {
     const message =
       errorMessages || warningMessages || 'FHIR server returned an error';
 
-    return new FHIRNetworkError(
-      `${context}: ${message}`,
-      new Error(message)
-    );
+    return new FHIRNetworkError(`${context}: ${message}`, new Error(message));
   }
 
   /**
@@ -92,7 +89,9 @@ export class ResponseHandler {
     if (!bundle.resourceType || bundle.resourceType !== 'Bundle') {
       throw new FHIRNetworkError(
         `Invalid response format: Expected Bundle resource type, got: ${bundle.resourceType || 'undefined'}`,
-        new Error(`Expected Bundle resource type, got: ${bundle.resourceType || 'undefined'}`)
+        new Error(
+          `Expected Bundle resource type, got: ${bundle.resourceType || 'undefined'}`
+        )
       );
     }
 
@@ -134,7 +133,9 @@ export class ResponseHandler {
         if (entry.resource && entry.resource.resourceType !== 'Patient') {
           throw new FHIRNetworkError(
             `Invalid bundle entry: Entry ${index} contains non-Patient resource: ${entry.resource.resourceType}`,
-            new Error(`Entry ${index} contains non-Patient resource: ${entry.resource.resourceType}`)
+            new Error(
+              `Entry ${index} contains non-Patient resource: ${entry.resource.resourceType}`
+            )
           );
         }
       });
@@ -166,7 +167,9 @@ export class ResponseHandler {
     if (!patient.resourceType || patient.resourceType !== 'Patient') {
       throw new FHIRNetworkError(
         `Invalid response format: Expected Patient resource type, got: ${patient.resourceType || 'undefined'}`,
-        new Error(`Expected Patient resource type, got: ${patient.resourceType || 'undefined'}`)
+        new Error(
+          `Expected Patient resource type, got: ${patient.resourceType || 'undefined'}`
+        )
       );
     }
 

@@ -137,16 +137,17 @@ describe('FHIRClient', () => {
     it('should return PatientQueryBuilder from patients() method', () => {
       const client = new FHIRClient(validConfig);
       const queryBuilder = client.patients();
-      
+
       expect(queryBuilder).toBeDefined();
       expect(queryBuilder.constructor.name).toBe('PatientQueryBuilder');
     });
 
     it('should allow fluent query building', () => {
       const client = new FHIRClient(validConfig);
-      
+
       expect(() => {
-        client.patients()
+        client
+          .patients()
           .where('family', 'Smith')
           .where('gender', 'male')
           .limit(10)

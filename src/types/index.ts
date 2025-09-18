@@ -252,7 +252,7 @@ export interface PatientSearchParams {
   'address-postalcode'?: string;
   'address-state'?: string;
   'address-use'?: string;
-  active?: boolean;
+  active?: string | boolean;
   deceased?: boolean;
   email?: string;
   phone?: string;

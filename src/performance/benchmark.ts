@@ -35,13 +35,12 @@ export interface BenchmarkSuite {
 }
 
 export class PerformanceBenchmark {
-
   /**
    * Run cache performance benchmarks
    */
   async runCacheBenchmarks(): Promise<BenchmarkSuite> {
     console.log('Running cache performance benchmarks...');
-    
+
     const results: BenchmarkResult[] = [];
     const startTime = performance.now();
 
@@ -73,7 +72,7 @@ export class PerformanceBenchmark {
    */
   async runConnectionPoolBenchmarks(): Promise<BenchmarkSuite> {
     console.log('Running connection pool benchmarks...');
-    
+
     const results: BenchmarkResult[] = [];
     const startTime = performance.now();
 
@@ -96,7 +95,7 @@ export class PerformanceBenchmark {
    */
   async runHttpClientBenchmarks(): Promise<BenchmarkSuite> {
     console.log('Running HTTP client benchmarks...');
-    
+
     const results: BenchmarkResult[] = [];
     const startTime = performance.now();
 
@@ -119,7 +118,7 @@ export class PerformanceBenchmark {
    */
   async runMemoryBenchmarks(): Promise<BenchmarkSuite> {
     console.log('Running memory usage benchmarks...');
-    
+
     const results: BenchmarkResult[] = [];
     const startTime = performance.now();
 
@@ -170,7 +169,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -226,7 +226,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -276,7 +277,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -318,7 +320,7 @@ export class PerformanceBenchmark {
         statusText: 'OK',
         headers: {
           'cache-control': 'max-age=300',
-          'etag': `"etag-${i}"`,
+          etag: `"etag-${i}"`,
         },
       };
       cache.set(`key-${i}`, response);
@@ -337,7 +339,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -374,7 +377,7 @@ export class PerformanceBenchmark {
         statusText: 'OK',
         headers: {
           'cache-control': 'max-age=300',
-          'etag': `"etag-${i}"`,
+          etag: `"etag-${i}"`,
         },
       };
       cache.set(`key-${i}`, response);
@@ -404,7 +407,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -441,7 +445,7 @@ export class PerformanceBenchmark {
         statusText: 'OK',
         headers: {
           'cache-control': 'max-age=300',
-          'etag': `"etag-${i}"`,
+          etag: `"etag-${i}"`,
           'last-modified': new Date().toUTCString(),
         },
       };
@@ -474,7 +478,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -518,7 +523,7 @@ export class PerformanceBenchmark {
         statusText: 'OK',
         headers: {
           'cache-control': 'max-age=300',
-          'etag': `"etag-${i}"`,
+          etag: `"etag-${i}"`,
         },
       };
       await cacheManager.set(`key-${i}`, response);
@@ -538,7 +543,8 @@ export class PerformanceBenchmark {
       operations,
       duration,
       operationsPerSecond: operations / (duration / 1000),
-      averageLatency: latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
+      averageLatency:
+        latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length,
       minLatency: Math.min(...latencies),
       maxLatency: Math.max(...latencies),
       memoryUsage: {
@@ -632,10 +638,21 @@ export class PerformanceBenchmark {
    * Calculate summary statistics
    */
   private calculateSummary(results: BenchmarkResult[]) {
-    const totalOperations = results.reduce((sum, result) => sum + result.operations, 0);
-    const averageOpsPerSecond = results.reduce((sum, result) => sum + result.operationsPerSecond, 0) / results.length;
-    const totalMemoryDelta = results.reduce((sum, result) => sum + result.memoryUsage.delta.heapUsed, 0);
-    const memoryEfficiency = totalOperations > 0 ? totalOperations / (totalMemoryDelta / 1024 / 1024) : 0; // ops per MB
+    const totalOperations = results.reduce(
+      (sum, result) => sum + result.operations,
+      0
+    );
+    const averageOpsPerSecond =
+      results.reduce((sum, result) => sum + result.operationsPerSecond, 0) /
+      results.length;
+    const totalMemoryDelta = results.reduce(
+      (sum, result) => sum + result.memoryUsage.delta.heapUsed,
+      0
+    );
+    const memoryEfficiency =
+      totalOperations > 0
+        ? totalOperations / (totalMemoryDelta / 1024 / 1024)
+        : 0; // ops per MB
 
     return {
       totalOperations,

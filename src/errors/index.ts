@@ -5,7 +5,10 @@
  * comprehensive context information and resilience features.
  */
 
-import { ValidationError as ValidationErrorType, OperationOutcome } from '../types';
+import {
+  ValidationError as ValidationErrorType,
+  OperationOutcome,
+} from '../types';
 
 export interface ErrorContext {
   timestamp: string;
@@ -104,12 +107,12 @@ export class FHIRServerError extends FHIRError {
         .filter(issue => issue.diagnostics)
         .map(issue => issue.diagnostics)
         .join('; ');
-      
+
       if (diagnostics) {
         return `${this.message}: ${diagnostics}`;
       }
     }
-    
+
     return this.message;
   }
 }
@@ -175,7 +178,9 @@ export class ConfigurationError extends FHIRError {
 
   override getUserMessage(): string {
     if (this.validationErrors?.length) {
-      const errorMessages = this.validationErrors.map(e => e.message).join(', ');
+      const errorMessages = this.validationErrors
+        .map(e => e.message)
+        .join(', ');
       return `Configuration error: ${errorMessages}`;
     }
     return this.message;
@@ -240,3 +245,6 @@ export class RateLimitError extends FHIRError {
     return 'Rate limit exceeded. Please wait before retrying.';
   }
 }
+
+// Aliases for backward compatibility and consistency with examples
+export { AuthenticationError as FHIRAuthenticationError };

@@ -22,6 +22,7 @@ import {
   FHIRValidationError,
 } from '../errors';
 import { HttpClient } from '../http/http-client';
+import { EnhancedHttpClient } from '../http/enhanced-http-client';
 import { AuthManager } from '../auth/auth-manager';
 import { QueryBuilder } from '../utils/query-builder';
 import { ResponseHandler } from '../utils/response-handler';
@@ -29,7 +30,7 @@ import { PatientQueryBuilder } from './patient-query-builder';
 
 export class FHIRClient {
   private config: Required<FHIRClientConfig>;
-  private httpClient: HttpClient;
+  private httpClient: HttpClient | EnhancedHttpClient;
   private authManager: AuthManager;
 
   constructor(config: FHIRClientConfig) {
@@ -52,18 +53,47 @@ export class FHIRClient {
       userAgent: config.userAgent || 'fhir-patient-api/1.0.0',
       headers: config.headers || {},
       validateSSL: config.validateSSL !== false, // Default to true
+      cache: config.cache || {
+        enabled: false,
+        maxSize: 10 * 1024 * 1024, // 10MB
+        defaultTTL: 300000, // 5 minutes
+        respectCacheHeaders: true,
+        staleWhileRevalidate: true,
+        strategy: 'adaptive',
+      },
+      connectionPool: config.connectionPool || {
+        maxConnections: 100,
+        maxConnectionsPerHost: 10,
+        connectionTimeout: 30000,
+        idleTimeout: 60000,
+        enableHttp2: true,
+      },
     };
 
-    // Initialize HTTP client
-    this.httpClient = new HttpClient({
-      baseURL: this.config.baseUrl,
-      timeout: this.config.timeout,
-      headers: {
-        'User-Agent': this.config.userAgent,
-        ...this.config.headers,
-      },
-      validateSSL: this.config.validateSSL,
-    });
+    // Initialize HTTP client - use enhanced client if caching is enabled
+    if (this.config.cache.enabled) {
+      this.httpClient = new EnhancedHttpClient({
+        baseURL: this.config.baseUrl,
+        timeout: this.config.timeout,
+        headers: {
+          'User-Agent': this.config.userAgent,
+          ...this.config.headers,
+        },
+        validateSSL: this.config.validateSSL,
+        cache: this.config.cache,
+        connectionPool: this.config.connectionPool,
+      });
+    } else {
+      this.httpClient = new HttpClient({
+        baseURL: this.config.baseUrl,
+        timeout: this.config.timeout,
+        headers: {
+          'User-Agent': this.config.userAgent,
+          ...this.config.headers,
+        },
+        validateSSL: this.config.validateSSL,
+      });
+    }
 
     // Initialize authentication manager
     this.authManager = new AuthManager(this.config.auth);
@@ -288,6 +318,35 @@ export class FHIRClient {
    */
   async refreshAuth(): Promise<void> {
     await this.authManager.refreshAuth();
+  }
+
+  /**
+   * Get client performance statistics
+   */
+  getStats() {
+    if (this.httpClient instanceof EnhancedHttpClient) {
+      return this.httpClient.getStats();
+    }
+    return null;
+  }
+
+  /**
+   * Clear cache (if caching is enabled)
+   */
+  clearCache(): void {
+    if (this.httpClient instanceof EnhancedHttpClient) {
+      this.httpClient.clearCache();
+    }
+  }
+
+  /**
+   * Invalidate cache entries by pattern (if caching is enabled)
+   */
+  invalidateCache(pattern: string | RegExp): number {
+    if (this.httpClient instanceof EnhancedHttpClient) {
+      return this.httpClient.invalidateCache(pattern);
+    }
+    return 0;
   }
 
   /**
@@ -634,5 +693,14 @@ export class FHIRClient {
       `${context}: Unknown error`,
       new Error(`An unexpected error occurred: ${String(error)}`)
     );
+  }
+
+  /**
+   * Destroy client and cleanup resources
+   */
+  async destroy(): Promise<void> {
+    if (this.httpClient instanceof EnhancedHttpClient) {
+      await this.httpClient.destroy();
+    }
   }
 }

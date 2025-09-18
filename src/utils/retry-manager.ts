@@ -70,7 +70,7 @@ export class RetryManager {
         
         // If we succeeded after retries, enhance the context to indicate this
         if (attempt > 1 && context) {
-          (context as any).succeededAfterRetries = attempt - 1;
+          (context as Partial<ErrorContext> & { succeededAfterRetries?: number }).succeededAfterRetries = attempt - 1;
         }
         
         return result;
@@ -295,7 +295,7 @@ export function withRetry<T extends any[], R>(
   retryManager: RetryManager = defaultRetryManager
 ) {
   return function (
-    _target: any,
+    _target: object,
     _propertyKey: string,
     descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>
   ) {

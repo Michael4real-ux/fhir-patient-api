@@ -481,6 +481,22 @@ export interface FHIRClientConfig {
   userAgent?: string;
   headers?: Record<string, string>;
   validateSSL?: boolean;
+  cache?: {
+    enabled: boolean;
+    maxSize: number;
+    maxEntries?: number;
+    defaultTTL: number;
+    respectCacheHeaders: boolean;
+    staleWhileRevalidate: boolean;
+    strategy: 'lru' | 'http' | 'adaptive';
+  };
+  connectionPool?: {
+    maxConnections: number;
+    maxConnectionsPerHost: number;
+    connectionTimeout: number;
+    idleTimeout: number;
+    enableHttp2: boolean;
+  };
 }
 
 // HTTP Request Configuration

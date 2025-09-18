@@ -291,8 +291,8 @@ export const defaultResilienceManager = new ResilienceManager({
 export function withResilience(
   resilienceManager: ResilienceManager = defaultResilienceManager
 ) {
-  return function <T extends any[], R>(
-    _target: any,
+  return function <T extends unknown[], R>(
+    _target: object,
     _propertyKey: string,
     descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>
   ) {

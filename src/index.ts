@@ -4,16 +4,21 @@
  * A user-friendly JavaScript/TypeScript API for downloading patient data from any FHIR server.
  */
 
-// Core exports
+// Core exports - import directly from source modules to avoid circular dependencies
 export * from './types';
-export * from './client';
 export * from './errors';
 export * from './auth';
 export * from './http';
 export * from './utils';
+export * from './cache';
+export * from './performance';
+
+// Client exports - direct imports to avoid circular dependencies
+export { FHIRClient } from './client/fhir-client';
+export { PatientQueryBuilder } from './client/patient-query-builder';
 
 // Simple function API exports
-import { FHIRClient } from './client';
+import { FHIRClient } from './client/fhir-client';
 import { Patient, Bundle, PatientSearchParams, FHIRClientConfig } from './types';
 
 /**

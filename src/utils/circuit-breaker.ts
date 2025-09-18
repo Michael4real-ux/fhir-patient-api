@@ -330,8 +330,8 @@ export class CircuitBreaker {
  * Circuit breaker decorator for methods
  */
 export function withCircuitBreaker(circuitBreaker: CircuitBreaker) {
-  return function <T extends any[], R>(
-    _target: any,
+  return function <T extends unknown[], R>(
+    _target: object,
     _propertyKey: string,
     descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>
   ) {

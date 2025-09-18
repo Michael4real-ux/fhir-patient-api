@@ -361,7 +361,7 @@ export class PatientQueryBuilder {
 
                 // Handle errors in the bundle
                 if (bundle && typeof bundle === 'object' && '_error' in bundle) {
-                    throw (bundle as any)._error;
+                    throw (bundle as { _error: Error })._error;
                 }
 
                 // Check if bundle is valid

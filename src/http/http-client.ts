@@ -117,7 +117,7 @@ export class HttpClient {
    * Generate correlation ID for request tracking
    */
   private generateCorrelationId(): string {
-    return `http-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `http-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -151,7 +151,7 @@ export class HttpClient {
       // Try to extract FHIR OperationOutcome
       let operationOutcome: OperationOutcome | undefined;
       if (responseData && typeof responseData === 'object') {
-        const data = responseData as any;
+        const data = responseData as { resourceType?: string };
         if (data.resourceType === 'OperationOutcome') {
           operationOutcome = data as OperationOutcome;
         }

@@ -583,10 +583,6 @@ npm run examples:basic
 npm run examples:advanced
 ```
 
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
-
 ### Development Setup
 
 ```bash

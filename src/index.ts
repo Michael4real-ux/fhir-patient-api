@@ -17,6 +17,9 @@ export * from './performance';
 export { FHIRClient } from './client/fhir-client';
 export { PatientQueryBuilder } from './client/patient-query-builder';
 
+// Extensibility framework
+export * from './extensibility';
+
 // Simple function API exports
 import { FHIRClient } from './client/fhir-client';
 import { Patient, Bundle, PatientSearchParams, FHIRClientConfig } from './types';

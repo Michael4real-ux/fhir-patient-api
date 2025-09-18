@@ -234,6 +234,7 @@ export class PatientQueryBuilder {
             throw new FHIRValidationError(
                 'Invalid query parameters',
                 undefined,
+                undefined,
                 validation.errors.map(e => e.message).join(', ')
             );
         }
@@ -332,7 +333,7 @@ export class PatientQueryBuilder {
 
         // Buffer for concurrent page fetching
         const pageBuffer: Promise<Bundle<Patient>>[] = [];
-        let bufferIndex = 0;
+        // let bufferIndex = 0; // Unused variable
 
         while (hasMoreResults || pageBuffer.length > 0) {
             // Fill buffer with concurrent requests up to maxConcurrency
@@ -453,13 +454,13 @@ export class PatientQueryBuilder {
         }
 
         const results: Patient[] = [];
-        let processed = 0;
+        // let processed = 0; // Unused variable
 
         for await (const patient of this.stream({ 
             pageSize, 
             maxConcurrency, 
             onProgress: (p, t) => {
-                processed = p;
+                // processed = p; // Unused variable
                 if (onProgress) onProgress(p, t);
             }
         })) {
@@ -493,7 +494,7 @@ export class PatientQueryBuilder {
         for (let i = 0; i < queries.length; i += maxConcurrency) {
             const batch = queries.slice(i, i + maxConcurrency);
             
-            const batchPromises = batch.map(async (query, index) => {
+            const batchPromises = batch.map(async (query, _index) => {
                 try {
                     return await query.execute();
                 } catch (error) {
@@ -600,6 +601,7 @@ export class PatientQueryBuilder {
         if (!validation.isValid) {
             throw new FHIRValidationError(
                 'Cannot build URL with invalid parameters',
+                undefined,
                 undefined,
                 validation.errors.map(e => e.message).join(', ')
             );

@@ -26,6 +26,7 @@ export class JWTManager {
       } else {
         throw new AuthenticationError(
           'Provided JWT token is invalid or expired',
+          undefined,
           'Token validation failed'
         );
       }
@@ -49,6 +50,7 @@ export class JWTManager {
 
     throw new AuthenticationError(
       'JWT configuration invalid',
+      undefined,
       'Either token or privateKey must be provided'
     );
   }
@@ -124,6 +126,7 @@ export class JWTManager {
     } catch (error) {
       throw new AuthenticationError(
         'Failed to generate JWT token',
+        undefined,
         error instanceof Error ? error.message : 'Unknown error'
       );
     }
@@ -141,12 +144,13 @@ export class JWTManager {
     if (!match) {
       throw new AuthenticationError(
         'Invalid time format',
+        undefined,
         `Expected format like "1h", "30m", got: ${timeStr}`
       );
     }
 
-    const value = parseInt(match[1]!);
-    const unit = match[2]!;
+    const value = parseInt(match[1] as string);
+    const unit = match[2] as string;
 
     switch (unit) {
       case 's':
@@ -160,6 +164,7 @@ export class JWTManager {
       default:
         throw new AuthenticationError(
           'Invalid time unit',
+          undefined,
           `Supported units: s, m, h, d`
         );
     }

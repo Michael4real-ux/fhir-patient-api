@@ -18,7 +18,7 @@ import {
 import {
   AuthenticationError,
   ConfigurationError,
-  NetworkError,
+  FHIRNetworkError,
   FHIRValidationError,
 } from '../errors';
 import { HttpClient } from '../http/http-client';
@@ -93,6 +93,7 @@ export class FHIRClient {
       if (!validation.isValid) {
         throw new FHIRValidationError(
           'Invalid search parameters',
+          undefined,
           undefined,
           validation.errors.join(', ')
         );
@@ -471,10 +472,10 @@ export class FHIRClient {
       return error;
     }
 
-    if (error instanceof NetworkError) {
+    if (error instanceof FHIRNetworkError) {
       // Enhance network error with additional context
       const enhancedMessage = `${context}: ${error.message}`;
-      return new NetworkError(enhancedMessage, error.statusCode, error.details);
+      return new FHIRNetworkError(enhancedMessage, error.originalError);
     }
 
     // Handle axios/HTTP errors with detailed mapping
@@ -494,11 +495,13 @@ export class FHIRClient {
         case 401:
           return new AuthenticationError(
             'Authentication failed',
+            undefined,
             'Invalid or expired credentials'
           );
         case 403:
           return new AuthenticationError(
             'Access forbidden',
+            undefined,
             'Insufficient permissions to access this resource'
           );
         case 404:
@@ -574,7 +577,7 @@ export class FHIRClient {
         }
       }
 
-      return new NetworkError(errorMessage, status, details);
+      return new FHIRNetworkError(errorMessage, new Error(details || 'Unknown error'));
     }
 
     // Handle network/connection errors
@@ -582,34 +585,30 @@ export class FHIRClient {
       const message = error.message.toLowerCase();
 
       if (message.includes('timeout') || message.includes('etimedout')) {
-        return new NetworkError(
+        return new FHIRNetworkError(
           `${context}: Request timeout`,
-          undefined,
-          `The request took too long to complete (timeout: ${this.config.timeout}ms)`
+          new Error(`The request took too long to complete (timeout: ${this.config.timeout}ms)`)
         );
       }
 
       if (message.includes('econnrefused')) {
-        return new NetworkError(
+        return new FHIRNetworkError(
           `${context}: Connection refused`,
-          undefined,
-          `Unable to connect to the FHIR server at ${this.config.baseUrl}`
+          new Error(`Unable to connect to the FHIR server at ${this.config.baseUrl}`)
         );
       }
 
       if (message.includes('enotfound') || message.includes('getaddrinfo')) {
-        return new NetworkError(
+        return new FHIRNetworkError(
           `${context}: Host not found`,
-          undefined,
-          `Unable to resolve hostname: ${new URL(this.config.baseUrl).hostname}`
+          new Error(`Unable to resolve hostname: ${new URL(this.config.baseUrl).hostname}`)
         );
       }
 
       if (message.includes('econnreset')) {
-        return new NetworkError(
+        return new FHIRNetworkError(
           `${context}: Connection reset`,
-          undefined,
-          'The connection was reset by the server'
+          new Error('The connection was reset by the server')
         );
       }
 
@@ -618,25 +617,22 @@ export class FHIRClient {
         message.includes('ssl') ||
         message.includes('tls')
       ) {
-        return new NetworkError(
+        return new FHIRNetworkError(
           `${context}: SSL/TLS error`,
-          undefined,
-          `Certificate or SSL/TLS error: ${error.message}`
+          new Error(`Certificate or SSL/TLS error: ${error.message}`)
         );
       }
 
-      return new NetworkError(
+      return new FHIRNetworkError(
         `${context}: ${error.message}`,
-        undefined,
-        error.stack
+        error
       );
     }
 
     // Fallback for unknown errors
-    return new NetworkError(
+    return new FHIRNetworkError(
       `${context}: Unknown error`,
-      undefined,
-      `An unexpected error occurred: ${String(error)}`
+      new Error(`An unexpected error occurred: ${String(error)}`)
     );
   }
 }

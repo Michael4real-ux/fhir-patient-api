@@ -45,7 +45,8 @@ export class AuthManager {
       default:
         throw new AuthenticationError(
           'Unsupported authentication type',
-          `Unknown auth type: ${(this.config as { type: string }).type}`
+          undefined,
+          `Unknown auth type: ${(this.config as Record<string, unknown>)['type']}`
         );
     }
 
@@ -98,7 +99,7 @@ export class AuthManager {
 
       default:
         errors.push(
-          `Unsupported authentication type: ${(config as { type: string }).type}`
+          `Unsupported authentication type: ${(config as Record<string, unknown>)['type']}`
         );
         break;
     }

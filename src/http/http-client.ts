@@ -1,5 +1,5 @@
 /**
- * HTTP Client implementation using axios
+ * HTTP Client implementation using axios with resilience features
  */
 
 import axios, {
@@ -9,17 +9,25 @@ import axios, {
   AxiosError,
 } from 'axios';
 import https from 'https';
-import { HttpResponse, RequestConfig } from '../types';
-import { NetworkError } from '../errors';
+import { HttpResponse, RequestConfig, OperationOutcome } from '../types';
+import { 
+  FHIRNetworkError, 
+  FHIRServerError, 
+  RateLimitError,
+  ErrorContext 
+} from '../errors';
+import { ResilienceManager } from '../utils/resilience-manager';
 
 export class HttpClient {
   private axiosInstance: AxiosInstance;
+  private resilienceManager: ResilienceManager;
 
   constructor(config: {
     baseURL: string;
     timeout?: number;
     headers?: Record<string, string>;
     validateSSL?: boolean;
+    resilience?: ResilienceManager;
   }) {
     this.axiosInstance = axios.create({
       baseURL: config.baseURL,
@@ -37,6 +45,22 @@ export class HttpClient {
       }),
     });
 
+    // Initialize resilience manager
+    this.resilienceManager = config.resilience || new ResilienceManager({
+      retry: {
+        maxAttempts: 3,
+        baseDelay: 1000,
+        maxDelay: 10000,
+        jitterType: 'full',
+      },
+      circuitBreaker: {
+        failureThreshold: 5,
+        recoveryTimeout: 30000,
+        volumeThreshold: 10,
+        errorPercentageThreshold: 50,
+      },
+    });
+
     // Add response interceptor for error handling
     this.axiosInstance.interceptors.response.use(
       response => response,
@@ -47,139 +71,126 @@ export class HttpClient {
   }
 
   /**
-   * Make HTTP request with retry logic
+   * Make HTTP request with resilience features
    */
   async request<T = unknown>(config: RequestConfig): Promise<HttpResponse<T>> {
-    const maxRetries = 3;
-    let lastError: Error | undefined;
+    const context: Partial<ErrorContext> = {
+      requestUrl: config.url,
+      requestMethod: config.method,
+      requestHeaders: config.headers,
+      timestamp: new Date().toISOString(),
+      correlationId: this.generateCorrelationId(),
+    };
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const axiosConfig: AxiosRequestConfig = {
-          method: config.method,
-          url: config.url,
-        };
+    return this.resilienceManager.execute(async () => {
+      const axiosConfig: AxiosRequestConfig = {
+        method: config.method,
+        url: config.url,
+      };
 
-        if (config.headers) {
-          axiosConfig.headers = config.headers;
-        }
-        if (config.params) {
-          axiosConfig.params = config.params;
-        }
-        if (config.data) {
-          axiosConfig.data = config.data;
-        }
-        if (config.timeout) {
-          axiosConfig.timeout = config.timeout;
-        }
-
-        const response: AxiosResponse<T> =
-          await this.axiosInstance.request(axiosConfig);
-
-        return {
-          data: response.data,
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers as Record<string, string>,
-        };
-      } catch (error) {
-        lastError = error as Error;
-
-        // Don't retry on client errors (4xx) or authentication errors
-        if (this.isNonRetryableError(error as AxiosError)) {
-          break;
-        }
-
-        // Don't retry on the last attempt
-        if (attempt === maxRetries) {
-          break;
-        }
-
-        // Exponential backoff: wait 1s, 2s, 4s
-        const delay = Math.pow(2, attempt) * 1000;
-        await this.sleep(delay);
+      if (config.headers) {
+        axiosConfig.headers = config.headers;
       }
-    }
+      if (config.params) {
+        axiosConfig.params = config.params;
+      }
+      if (config.data) {
+        axiosConfig.data = config.data;
+      }
+      if (config.timeout) {
+        axiosConfig.timeout = config.timeout;
+      }
 
-    if (!lastError) {
-      throw new NetworkError(
-        'Request failed',
-        undefined,
-        'Unknown error occurred'
-      );
-    }
+      const response: AxiosResponse<T> =
+        await this.axiosInstance.request(axiosConfig);
 
-    if (lastError instanceof NetworkError) {
-      throw lastError;
-    }
-    throw this.mapAxiosError(lastError as AxiosError);
+      return {
+        data: response.data,
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers as Record<string, string>,
+      };
+    }, context);
   }
 
   /**
-   * Check if error should not be retried
+   * Generate correlation ID for request tracking
    */
-  private isNonRetryableError(error: AxiosError): boolean {
-    if (!error.response) {
-      return false; // Network errors should be retried
-    }
-
-    const status = error.response.status;
-    // Don't retry client errors (4xx) except for 429 (rate limit)
-    return status >= 400 && status < 500 && status !== 429;
+  private generateCorrelationId(): string {
+    return `http-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
-   * Sleep for specified milliseconds
+   * Map axios errors to appropriate FHIR errors
    */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  private mapAxiosError(error: AxiosError): Error {
+    const context: Partial<ErrorContext> = {
+      timestamp: new Date().toISOString(),
+      correlationId: this.generateCorrelationId(),
+    };
 
-  /**
-   * Map axios errors to our NetworkError
-   */
-  private mapAxiosError(error: AxiosError): NetworkError {
     if (error.response) {
       // Server responded with error status
-      return new NetworkError(
-        `HTTP ${error.response.status}: ${error.response.statusText}`,
-        error.response.status,
+      const status = error.response.status;
+      const responseData = error.response.data;
+      
+      context.responseHeaders = error.response.headers as Record<string, string>;
+
+      // Handle rate limiting
+      if (status === 429) {
+        const retryAfter = error.response.headers['retry-after'];
+        const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined;
+        
+        return new RateLimitError(
+          'Rate limit exceeded',
+          retryAfterSeconds,
+          context
+        );
+      }
+
+      // Try to extract FHIR OperationOutcome
+      let operationOutcome: OperationOutcome | undefined;
+      if (responseData && typeof responseData === 'object') {
+        const data = responseData as any;
+        if (data.resourceType === 'OperationOutcome') {
+          operationOutcome = data as OperationOutcome;
+        }
+      }
+
+      return new FHIRServerError(
+        `HTTP ${status}: ${error.response.statusText}`,
+        status,
+        operationOutcome,
+        context,
         error.message
       );
     } else if (error.request) {
       // Request was made but no response received
+      let message = 'Network error';
+      let details = error.message || 'An unknown network error occurred';
+
       if (error.code === 'ECONNABORTED') {
-        return new NetworkError(
-          'Request timeout',
-          undefined,
-          'The request took too long to complete'
-        );
+        message = 'Request timeout';
+        details = 'The request took too long to complete';
       } else if (error.code === 'ECONNREFUSED') {
-        return new NetworkError(
-          'Connection refused',
-          undefined,
-          'Unable to connect to the server'
-        );
+        message = 'Connection refused';
+        details = 'Unable to connect to the server';
       } else if (error.code === 'ENOTFOUND') {
-        return new NetworkError(
-          'Host not found',
-          undefined,
-          'The server hostname could not be resolved'
-        );
-      } else {
-        return new NetworkError(
-          'Network error',
-          undefined,
-          error.message || 'An unknown network error occurred'
-        );
+        message = 'Host not found';
+        details = 'The server hostname could not be resolved';
+      } else if (error.code === 'ECONNRESET') {
+        message = 'Connection reset';
+        details = 'The connection was reset by the server';
       }
+
+      return new FHIRNetworkError(message, error, context, details);
     } else {
-      // Something else happened
-      return new NetworkError(
-        'Request error',
-        undefined,
-        error.message ||
-          'An unknown error occurred while setting up the request'
+      // Something else happened during request setup
+      return new FHIRNetworkError(
+        'Request setup error',
+        error,
+        context,
+        error.message || 'An unknown error occurred while setting up the request'
       );
     }
   }
@@ -196,5 +207,26 @@ export class HttpClient {
    */
   removeHeader(key: string): void {
     delete this.axiosInstance.defaults.headers[key];
+  }
+
+  /**
+   * Get resilience manager statistics
+   */
+  getResilienceStats() {
+    return this.resilienceManager.getStats();
+  }
+
+  /**
+   * Check if HTTP client is healthy
+   */
+  isHealthy(): boolean {
+    return this.resilienceManager.isHealthy();
+  }
+
+  /**
+   * Reset resilience state
+   */
+  resetResilience(): void {
+    this.resilienceManager.reset();
   }
 }

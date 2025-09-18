@@ -10,7 +10,7 @@ import {
   OperationOutcomeIssueDetailed,
   ErrorResponse,
 } from '../types';
-import { NetworkError } from '../errors';
+import { FHIRNetworkError } from '../errors';
 
 export class ResponseHandler {
   /**
@@ -39,10 +39,9 @@ export class ResponseHandler {
 
     // Check for successful status codes
     if (response.status < 200 || response.status >= 300) {
-      throw new NetworkError(
-        context,
-        response.status,
-        `HTTP ${response.status}: ${response.statusText}`
+      throw new FHIRNetworkError(
+        `${context}: HTTP ${response.status}: ${response.statusText}`,
+        new Error(`HTTP ${response.status}: ${response.statusText}`)
       );
     }
 
@@ -54,9 +53,9 @@ export class ResponseHandler {
    */
   private static createOperationOutcomeError(
     outcome: OperationOutcome,
-    statusCode: number,
+    _statusCode: number,
     context: string
-  ): NetworkError {
+  ): FHIRNetworkError {
     const issues = outcome.issue || [];
     const errorMessages = issues
       .filter(issue => issue.severity === 'error' || issue.severity === 'fatal')
@@ -73,7 +72,10 @@ export class ResponseHandler {
     const message =
       errorMessages || warningMessages || 'FHIR server returned an error';
 
-    return new NetworkError(context, statusCode, message);
+    return new FHIRNetworkError(
+      `${context}: ${message}`,
+      new Error(message)
+    );
   }
 
   /**
@@ -81,26 +83,23 @@ export class ResponseHandler {
    */
   static validateBundleResponse(bundle: Bundle<Patient>): void {
     if (!bundle || typeof bundle !== 'object') {
-      throw new NetworkError(
-        'Invalid response format',
-        undefined,
-        'Response is not a valid object'
+      throw new FHIRNetworkError(
+        'Invalid response format: Response is not a valid object',
+        new Error('Response is not a valid object')
       );
     }
 
     if (!bundle.resourceType || bundle.resourceType !== 'Bundle') {
-      throw new NetworkError(
-        'Invalid response format',
-        undefined,
-        `Expected Bundle resource type, got: ${bundle.resourceType || 'undefined'}`
+      throw new FHIRNetworkError(
+        `Invalid response format: Expected Bundle resource type, got: ${bundle.resourceType || 'undefined'}`,
+        new Error(`Expected Bundle resource type, got: ${bundle.resourceType || 'undefined'}`)
       );
     }
 
     if (!bundle.type) {
-      throw new NetworkError(
-        'Invalid bundle format',
-        undefined,
-        'Bundle missing required type field'
+      throw new FHIRNetworkError(
+        'Invalid bundle format: Bundle missing required type field',
+        new Error('Bundle missing required type field')
       );
     }
 
@@ -116,29 +115,26 @@ export class ResponseHandler {
       'collection',
     ];
     if (!validBundleTypes.includes(bundle.type)) {
-      throw new NetworkError(
-        'Invalid bundle type',
-        undefined,
-        `Invalid bundle type: ${bundle.type}. Expected one of: ${validBundleTypes.join(', ')}`
+      throw new FHIRNetworkError(
+        `Invalid bundle type: ${bundle.type}. Expected one of: ${validBundleTypes.join(', ')}`,
+        new Error(`Invalid bundle type: ${bundle.type}`)
       );
     }
 
     // Validate entries if present
     if (bundle.entry) {
       if (!Array.isArray(bundle.entry)) {
-        throw new NetworkError(
-          'Invalid bundle format',
-          undefined,
-          'Bundle entry must be an array'
+        throw new FHIRNetworkError(
+          'Invalid bundle format: Bundle entry must be an array',
+          new Error('Bundle entry must be an array')
         );
       }
 
       bundle.entry.forEach((entry, index) => {
         if (entry.resource && entry.resource.resourceType !== 'Patient') {
-          throw new NetworkError(
-            'Invalid bundle entry',
-            undefined,
-            `Entry ${index} contains non-Patient resource: ${entry.resource.resourceType}`
+          throw new FHIRNetworkError(
+            `Invalid bundle entry: Entry ${index} contains non-Patient resource: ${entry.resource.resourceType}`,
+            new Error(`Entry ${index} contains non-Patient resource: ${entry.resource.resourceType}`)
           );
         }
       });
@@ -149,10 +145,9 @@ export class ResponseHandler {
       bundle.total !== undefined &&
       (typeof bundle.total !== 'number' || bundle.total < 0)
     ) {
-      throw new NetworkError(
-        'Invalid bundle format',
-        undefined,
-        'Bundle total must be a non-negative number'
+      throw new FHIRNetworkError(
+        'Invalid bundle format: Bundle total must be a non-negative number',
+        new Error('Bundle total must be a non-negative number')
       );
     }
   }
@@ -162,18 +157,16 @@ export class ResponseHandler {
    */
   static validatePatientResponse(patient: Patient): void {
     if (!patient || typeof patient !== 'object') {
-      throw new NetworkError(
-        'Invalid response format',
-        undefined,
-        'Response is not a valid object'
+      throw new FHIRNetworkError(
+        'Invalid response format: Response is not a valid object',
+        new Error('Response is not a valid object')
       );
     }
 
     if (!patient.resourceType || patient.resourceType !== 'Patient') {
-      throw new NetworkError(
-        'Invalid response format',
-        undefined,
-        `Expected Patient resource type, got: ${patient.resourceType || 'undefined'}`
+      throw new FHIRNetworkError(
+        `Invalid response format: Expected Patient resource type, got: ${patient.resourceType || 'undefined'}`,
+        new Error(`Expected Patient resource type, got: ${patient.resourceType || 'undefined'}`)
       );
     }
 
@@ -182,20 +175,18 @@ export class ResponseHandler {
       typeof patient.id !== 'string' ||
       patient.id.trim().length === 0
     ) {
-      throw new NetworkError(
-        'Invalid patient data',
-        undefined,
-        'Patient resource missing required ID or ID is invalid'
+      throw new FHIRNetworkError(
+        'Invalid patient data: Patient resource missing required ID or ID is invalid',
+        new Error('Patient resource missing required ID or ID is invalid')
       );
     }
 
     // Validate patient name structure if present
     if (patient.name) {
       if (!Array.isArray(patient.name)) {
-        throw new NetworkError(
-          'Invalid patient data',
-          undefined,
-          'Patient name must be an array'
+        throw new FHIRNetworkError(
+          'Invalid patient data: Patient name must be an array',
+          new Error('Patient name must be an array')
         );
       }
 
@@ -212,10 +203,9 @@ export class ResponseHandler {
             'maiden',
           ].includes(name.use)
         ) {
-          throw new NetworkError(
-            'Invalid patient data',
-            undefined,
-            `Invalid name use value at index ${index}: ${name.use}`
+          throw new FHIRNetworkError(
+            `Invalid patient data: Invalid name use value at index ${index}: ${name.use}`,
+            new Error(`Invalid name use value at index ${index}: ${name.use}`)
           );
         }
       });
@@ -226,28 +216,25 @@ export class ResponseHandler {
       patient.gender &&
       !['male', 'female', 'other', 'unknown'].includes(patient.gender)
     ) {
-      throw new NetworkError(
-        'Invalid patient data',
-        undefined,
-        `Invalid gender value: ${patient.gender}`
+      throw new FHIRNetworkError(
+        `Invalid patient data: Invalid gender value: ${patient.gender}`,
+        new Error(`Invalid gender value: ${patient.gender}`)
       );
     }
 
     // Validate birthDate format if present
     if (patient.birthDate && !this.isValidFHIRDate(patient.birthDate)) {
-      throw new NetworkError(
-        'Invalid patient data',
-        undefined,
-        `Invalid birthDate format: ${patient.birthDate}`
+      throw new FHIRNetworkError(
+        `Invalid patient data: Invalid birthDate format: ${patient.birthDate}`,
+        new Error(`Invalid birthDate format: ${patient.birthDate}`)
       );
     }
 
     // Validate active field if present
     if (patient.active !== undefined && typeof patient.active !== 'boolean') {
-      throw new NetworkError(
-        'Invalid patient data',
-        undefined,
-        'Patient active field must be a boolean'
+      throw new FHIRNetworkError(
+        'Invalid patient data: Patient active field must be a boolean',
+        new Error('Patient active field must be a boolean')
       );
     }
   }

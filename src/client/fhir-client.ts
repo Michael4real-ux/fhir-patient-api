@@ -1,0 +1,549 @@
+/**
+ * FHIR Client implementation
+ *
+ * Production-ready FHIR client with real HTTP requests, proper authentication,
+ * and comprehensive error handling.
+ */
+
+import {
+  FHIRClientConfig,
+  Patient,
+  Bundle,
+  PatientSearchParams,
+  ValidationResult,
+  ValidationError,
+  CapabilityStatement,
+  ErrorResponse,
+} from '../types';
+import {
+  AuthenticationError,
+  ConfigurationError,
+  NetworkError,
+  FHIRValidationError,
+} from '../errors';
+import { HttpClient } from '../http/http-client';
+import { AuthManager } from '../auth/auth-manager';
+import { QueryBuilder } from '../utils/query-builder';
+import { ResponseHandler } from '../utils/response-handler';
+import { PatientQueryBuilder } from './patient-query-builder';
+
+export class FHIRClient {
+  private config: Required<FHIRClientConfig>;
+  private httpClient: HttpClient;
+  private authManager: AuthManager;
+
+  constructor(config: FHIRClientConfig) {
+    // Validate configuration
+    const validation = this.validateConfig(config);
+    if (!validation.isValid) {
+      throw new ConfigurationError(
+        'Invalid client configuration',
+        validation.errors
+      );
+    }
+
+    // Set default configuration values
+    this.config = {
+      baseUrl: config.baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      auth: config.auth || { type: 'none' },
+      timeout: config.timeout || 30000,
+      retryAttempts: config.retryAttempts || 3,
+      retryDelay: config.retryDelay || 1000,
+      userAgent: config.userAgent || 'fhir-patient-api/1.0.0',
+      headers: config.headers || {},
+      validateSSL: config.validateSSL !== false, // Default to true
+    };
+
+    // Initialize HTTP client
+    this.httpClient = new HttpClient({
+      baseURL: this.config.baseUrl,
+      timeout: this.config.timeout,
+      headers: {
+        'User-Agent': this.config.userAgent,
+        ...this.config.headers,
+      },
+      validateSSL: this.config.validateSSL,
+    });
+
+    // Initialize authentication manager
+    this.authManager = new AuthManager(this.config.auth);
+  }
+
+  /**
+   * Create a fluent query builder for patients
+   */
+  patients(): PatientQueryBuilder {
+    return new PatientQueryBuilder(
+      this.config.baseUrl,
+      (params: PatientSearchParams) => this.getPatients(params)
+    );
+  }
+
+  /**
+   * Get patients with optional search parameters
+   */
+  async getPatients(params?: PatientSearchParams): Promise<Bundle<Patient>> {
+    let sanitizedParams: PatientSearchParams | undefined;
+
+    // Sanitize and validate search parameters
+    if (params) {
+      sanitizedParams = QueryBuilder.sanitizeSearchParams(params);
+      const validation = QueryBuilder.validateSearchParams(sanitizedParams);
+      if (!validation.isValid) {
+        throw new FHIRValidationError(
+          'Invalid search parameters',
+          undefined,
+          validation.errors.join(', ')
+        );
+      }
+    }
+
+    try {
+      // Get authentication headers
+      const authHeaders = await this.authManager.getAuthHeaders();
+
+      // Build URL with sanitized parameters
+      const url = QueryBuilder.buildSearchUrl(
+        this.config.baseUrl,
+        'Patient',
+        sanitizedParams
+      );
+
+      // Make request with retry logic
+      const response = await this.httpClient.request<Bundle<Patient>>({
+        method: 'GET',
+        url,
+        headers: authHeaders,
+        timeout: this.config.timeout,
+      });
+
+      // Handle response
+      const bundle = ResponseHandler.handleFHIRResponse<Bundle<Patient>>(
+        response,
+        'Failed to fetch patients'
+      );
+
+      // Validate bundle structure
+      ResponseHandler.validateBundleResponse(bundle);
+
+      return bundle;
+    } catch (error) {
+      throw this.mapError(error, 'Failed to fetch patients');
+    }
+  }
+
+  /**
+   * Get a specific patient by ID with comprehensive validation
+   */
+  async getPatientById(id: string): Promise<Patient> {
+    // Comprehensive ID validation
+    if (!id || typeof id !== 'string') {
+      throw new FHIRValidationError(
+        'Patient ID must be a non-empty string',
+        'id'
+      );
+    }
+
+    const sanitizedId = id.trim();
+    if (sanitizedId.length === 0) {
+      throw new FHIRValidationError(
+        'Patient ID cannot be empty or only whitespace',
+        'id'
+      );
+    }
+
+    // Validate ID format (FHIR ID rules: A-Z, a-z, 0-9, -, ., _, max 64 chars)
+    const idRegex = /^[A-Za-z0-9\-._ ]{1,64}$/;
+    if (!idRegex.test(sanitizedId)) {
+      throw new FHIRValidationError(
+        'Patient ID contains invalid characters or is too long (max 64 characters, alphanumeric, -, ., _ only)',
+        'id'
+      );
+    }
+
+    try {
+      // Get authentication headers
+      const authHeaders = await this.authManager.getAuthHeaders();
+
+      // Build URL with sanitized ID
+      const url = QueryBuilder.buildResourceUrl(
+        this.config.baseUrl,
+        'Patient',
+        sanitizedId
+      );
+
+      // Make request with retry logic
+      const response = await this.httpClient.request<Patient>({
+        method: 'GET',
+        url,
+        headers: authHeaders,
+        timeout: this.config.timeout,
+      });
+
+      // Handle response
+      const patient = ResponseHandler.handleFHIRResponse<Patient>(
+        response,
+        `Failed to fetch patient with ID: ${sanitizedId}`
+      );
+
+      // Comprehensive patient validation
+      ResponseHandler.validatePatientResponse(patient);
+
+      return patient;
+    } catch (error) {
+      throw this.mapError(
+        error,
+        `Failed to fetch patient with ID: ${sanitizedId}`
+      );
+    }
+  }
+
+  /**
+   * Test connection to FHIR server with capability validation
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      const authHeaders = await this.authManager.getAuthHeaders();
+
+      const response = await this.httpClient.request({
+        method: 'GET',
+        url: `${this.config.baseUrl}/metadata`,
+        headers: authHeaders,
+        timeout: Math.min(this.config.timeout, 10000), // Use shorter timeout for connection test
+      });
+
+      if (response.status !== 200) {
+        return false;
+      }
+
+      // Validate that it's a proper FHIR server by checking capability statement
+      const capability = response.data as CapabilityStatement;
+      if (
+        !capability ||
+        capability.resourceType !== 'CapabilityStatement' ||
+        !capability.fhirVersion
+      ) {
+        return false;
+      }
+
+      // Check if server supports Patient resource
+      if (capability.rest && Array.isArray(capability.rest)) {
+        const serverRest = capability.rest.find(rest => rest.mode === 'server');
+        if (
+          serverRest &&
+          serverRest.resource &&
+          Array.isArray(serverRest.resource)
+        ) {
+          const patientResource = serverRest.resource.find(
+            res => res.type === 'Patient'
+          );
+          return !!patientResource;
+        }
+      }
+
+      // If we can't determine Patient support, assume it's available
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get server capability statement
+   */
+  async getCapabilityStatement(): Promise<CapabilityStatement> {
+    try {
+      const authHeaders = await this.authManager.getAuthHeaders();
+
+      const response = await this.httpClient.request<CapabilityStatement>({
+        method: 'GET',
+        url: `${this.config.baseUrl}/metadata`,
+        headers: authHeaders,
+        timeout: this.config.timeout,
+      });
+
+      const capability =
+        ResponseHandler.handleFHIRResponse<CapabilityStatement>(
+          response,
+          'Failed to fetch server capability statement'
+        );
+
+      return capability;
+    } catch (error) {
+      throw this.mapError(error, 'Failed to fetch server capability statement');
+    }
+  }
+
+  /**
+   * Get client configuration (read-only)
+   */
+  getConfig(): Readonly<FHIRClientConfig> {
+    return { ...this.config };
+  }
+
+  /**
+   * Refresh authentication (useful for JWT tokens)
+   */
+  async refreshAuth(): Promise<void> {
+    await this.authManager.refreshAuth();
+  }
+
+  /**
+   * Validate client configuration
+   */
+  private validateConfig(config: FHIRClientConfig): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    // Validate base URL
+    if (!config.baseUrl) {
+      errors.push({
+        field: 'baseUrl',
+        message: 'Base URL is required',
+        code: 'required',
+      });
+    } else {
+      try {
+        new URL(config.baseUrl);
+      } catch {
+        errors.push({
+          field: 'baseUrl',
+          message: 'Base URL must be a valid URL',
+          code: 'invalid-url',
+        });
+      }
+    }
+
+    // Validate timeout
+    if (
+      config.timeout !== undefined &&
+      (config.timeout <= 0 || config.timeout > 300000)
+    ) {
+      errors.push({
+        field: 'timeout',
+        message: 'Timeout must be between 1 and 300000 milliseconds',
+        code: 'invalid-range',
+      });
+    }
+
+    // Validate retry attempts
+    if (
+      config.retryAttempts !== undefined &&
+      (config.retryAttempts < 0 || config.retryAttempts > 10)
+    ) {
+      errors.push({
+        field: 'retryAttempts',
+        message: 'Retry attempts must be between 0 and 10',
+        code: 'invalid-range',
+      });
+    }
+
+    // Validate authentication configuration
+    if (config.auth) {
+      try {
+        const authValidation = AuthManager.validateConfig(config.auth);
+        if (authValidation && !authValidation.isValid) {
+          authValidation.errors.forEach(error => {
+            errors.push({
+              field: 'auth',
+              message: error,
+              code: 'invalid-auth',
+            });
+          });
+        }
+      } catch (authError) {
+        errors.push({
+          field: 'auth',
+          message: 'Authentication configuration validation failed',
+          code: 'auth-validation-error',
+        });
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Map errors to appropriate FHIR error types with detailed context
+   */
+  private mapError(error: unknown, context: string): Error {
+    // If it's already one of our error types, preserve context
+    if (
+      error instanceof FHIRValidationError ||
+      error instanceof AuthenticationError ||
+      error instanceof ConfigurationError
+    ) {
+      return error;
+    }
+
+    if (error instanceof NetworkError) {
+      // Enhance network error with additional context
+      const enhancedMessage = `${context}: ${error.message}`;
+      return new NetworkError(enhancedMessage, error.statusCode, error.details);
+    }
+
+    // Handle axios/HTTP errors with detailed mapping
+    if (error && typeof error === 'object' && 'response' in error) {
+      const httpError = error as ErrorResponse;
+      const status = httpError.response?.status;
+      const responseData = httpError.response?.data;
+
+      let errorMessage = context;
+      let details = httpError.message || 'Unknown error';
+
+      // Map specific HTTP status codes to meaningful messages
+      switch (status) {
+        case 400:
+          errorMessage = `${context}: Bad Request - Invalid parameters or request format`;
+          break;
+        case 401:
+          return new AuthenticationError(
+            'Authentication failed',
+            'Invalid or expired credentials'
+          );
+        case 403:
+          return new AuthenticationError(
+            'Access forbidden',
+            'Insufficient permissions to access this resource'
+          );
+        case 404:
+          errorMessage = `${context}: Resource not found`;
+          details = 'The requested resource does not exist on the server';
+          break;
+        case 405:
+          errorMessage = `${context}: Method not allowed`;
+          details = 'The HTTP method is not supported for this resource';
+          break;
+        case 409:
+          errorMessage = `${context}: Conflict`;
+          details =
+            'The request conflicts with the current state of the resource';
+          break;
+        case 410:
+          errorMessage = `${context}: Resource gone`;
+          details = 'The requested resource is no longer available';
+          break;
+        case 422:
+          errorMessage = `${context}: Unprocessable entity`;
+          details = 'The request was well-formed but contains semantic errors';
+          break;
+        case 429:
+          errorMessage = `${context}: Rate limit exceeded`;
+          details = 'Too many requests - please retry after some time';
+          break;
+        case 500:
+          errorMessage = `${context}: Internal server error`;
+          details = 'The FHIR server encountered an internal error';
+          break;
+        case 502:
+          errorMessage = `${context}: Bad gateway`;
+          details = 'The server received an invalid response from upstream';
+          break;
+        case 503:
+          errorMessage = `${context}: Service unavailable`;
+          details = 'The FHIR server is temporarily unavailable';
+          break;
+        case 504:
+          errorMessage = `${context}: Gateway timeout`;
+          details =
+            'The server did not receive a timely response from upstream';
+          break;
+        default:
+          if (status && status >= 400 && status < 500) {
+            errorMessage = `${context}: Client error (${status})`;
+          } else if (status && status >= 500) {
+            errorMessage = `${context}: Server error (${status})`;
+          }
+      }
+
+      // Include response data if it contains useful error information
+      if (responseData && typeof responseData === 'object') {
+        const dataWithResourceType = responseData as {
+          resourceType?: string;
+          issue?: Array<{
+            diagnostics?: string;
+            details?: { text?: string };
+          }>;
+        };
+        if (dataWithResourceType.resourceType === 'OperationOutcome') {
+          const issues = dataWithResourceType.issue || [];
+          const diagnostics = issues
+            .map(issue => issue.diagnostics || issue.details?.text)
+            .filter(Boolean)
+            .join('; ');
+          if (diagnostics) {
+            details = `${details}. Server details: ${diagnostics}`;
+          }
+        } else if (typeof responseData === 'string') {
+          details = `${details}. Server response: ${responseData}`;
+        }
+      }
+
+      return new NetworkError(errorMessage, status, details);
+    }
+
+    // Handle network/connection errors
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+
+      if (message.includes('timeout') || message.includes('etimedout')) {
+        return new NetworkError(
+          `${context}: Request timeout`,
+          undefined,
+          `The request took too long to complete (timeout: ${this.config.timeout}ms)`
+        );
+      }
+
+      if (message.includes('econnrefused')) {
+        return new NetworkError(
+          `${context}: Connection refused`,
+          undefined,
+          `Unable to connect to the FHIR server at ${this.config.baseUrl}`
+        );
+      }
+
+      if (message.includes('enotfound') || message.includes('getaddrinfo')) {
+        return new NetworkError(
+          `${context}: Host not found`,
+          undefined,
+          `Unable to resolve hostname: ${new URL(this.config.baseUrl).hostname}`
+        );
+      }
+
+      if (message.includes('econnreset')) {
+        return new NetworkError(
+          `${context}: Connection reset`,
+          undefined,
+          'The connection was reset by the server'
+        );
+      }
+
+      if (
+        message.includes('cert') ||
+        message.includes('ssl') ||
+        message.includes('tls')
+      ) {
+        return new NetworkError(
+          `${context}: SSL/TLS error`,
+          undefined,
+          `Certificate or SSL/TLS error: ${error.message}`
+        );
+      }
+
+      return new NetworkError(
+        `${context}: ${error.message}`,
+        undefined,
+        error.stack
+      );
+    }
+
+    // Fallback for unknown errors
+    return new NetworkError(
+      `${context}: Unknown error`,
+      undefined,
+      `An unexpected error occurred: ${String(error)}`
+    );
+  }
+}

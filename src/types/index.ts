@@ -59,7 +59,14 @@ export interface Reference {
 }
 
 export interface HumanName {
-  use?: 'usual' | 'official' | 'temp' | 'nickname' | 'anonymous' | 'old' | 'maiden';
+  use?:
+    | 'usual'
+    | 'official'
+    | 'temp'
+    | 'nickname'
+    | 'anonymous'
+    | 'old'
+    | 'maiden';
   text?: string;
   family?: string;
   given?: string[];
@@ -146,10 +153,20 @@ export interface Attachment {
 
 // Bundle Types
 
-export interface Bundle<T extends FHIRResource = FHIRResource> extends FHIRResource {
+export interface Bundle<T extends FHIRResource = FHIRResource>
+  extends FHIRResource {
   resourceType: 'Bundle';
   identifier?: Identifier;
-  type: 'document' | 'message' | 'transaction' | 'transaction-response' | 'batch' | 'batch-response' | 'history' | 'searchset' | 'collection';
+  type:
+    | 'document'
+    | 'message'
+    | 'transaction'
+    | 'transaction-response'
+    | 'batch'
+    | 'batch-response'
+    | 'history'
+    | 'searchset'
+    | 'collection';
   timestamp?: string;
   total?: number;
   link?: BundleLink[];
@@ -241,7 +258,7 @@ export interface PatientSearchParams {
   phone?: string;
   telecom?: string;
   organization?: string;
-  
+
   // Common search parameters
   _id?: string;
   _lastUpdated?: string;
@@ -254,7 +271,7 @@ export interface PatientSearchParams {
   _list?: string;
   _has?: string;
   _type?: string;
-  
+
   // Result parameters
   _count?: number;
   _offset?: number;
@@ -272,7 +289,16 @@ export type PatientSearchField = keyof PatientSearchParams;
 // Search parameter validation types
 export interface SearchParameterDefinition {
   name: string;
-  type: 'string' | 'number' | 'date' | 'token' | 'reference' | 'composite' | 'quantity' | 'uri' | 'special';
+  type:
+    | 'string'
+    | 'number'
+    | 'date'
+    | 'token'
+    | 'reference'
+    | 'composite'
+    | 'quantity'
+    | 'uri'
+    | 'special';
   description: string;
   required?: boolean;
   multipleOr?: boolean;
@@ -312,137 +338,94 @@ export interface ValidationError {
 }
 
 // Search parameter validators
-export const PATIENT_SEARCH_PARAMETERS: Record<string, SearchParameterDefinition> = {
+export const PATIENT_SEARCH_PARAMETERS: Record<
+  string,
+  SearchParameterDefinition
+> = {
   identifier: {
     name: 'identifier',
     type: 'token',
     description: 'A patient identifier',
     multipleOr: true,
-    multipleAnd: true
+    multipleAnd: true,
   },
   name: {
     name: 'name',
     type: 'string',
-    description: 'A server defined search that may match any of the string fields in the HumanName',
+    description:
+      'A server defined search that may match any of the string fields in the HumanName',
     multipleOr: true,
-    multipleAnd: true
+    multipleAnd: true,
   },
   family: {
     name: 'family',
     type: 'string',
     description: 'A portion of the family name of the patient',
     multipleOr: true,
-    multipleAnd: true
+    multipleAnd: true,
   },
   given: {
     name: 'given',
     type: 'string',
     description: 'A portion of the given name of the patient',
     multipleOr: true,
-    multipleAnd: true
+    multipleAnd: true,
   },
   gender: {
     name: 'gender',
     type: 'token',
     description: 'Gender of the patient',
-    multipleOr: true
+    multipleOr: true,
   },
   birthdate: {
     name: 'birthdate',
     type: 'date',
-    description: 'The patient\'s date of birth',
+    description: "The patient's date of birth",
     multipleOr: true,
-    multipleAnd: true
+    multipleAnd: true,
   },
   address: {
     name: 'address',
     type: 'string',
-    description: 'A server defined search that may match any of the string fields in the Address',
+    description:
+      'A server defined search that may match any of the string fields in the Address',
     multipleOr: true,
-    multipleAnd: true
+    multipleAnd: true,
   },
   active: {
     name: 'active',
     type: 'token',
     description: 'Whether the patient record is active',
-    multipleOr: true
+    multipleOr: true,
   },
   _count: {
     name: '_count',
     type: 'number',
-    description: 'Number of results to return'
+    description: 'Number of results to return',
   },
   _sort: {
     name: '_sort',
     type: 'string',
-    description: 'Sort order for results'
-  }
+    description: 'Sort order for results',
+  },
 };
 
-// Validation functions
-export function validatePatientSearchParams(params: PatientSearchParams): ValidationResult {
-  const errors: ValidationError[] = [];
-  
-  // Validate _count parameter
-  if (params._count !== undefined) {
-    if (typeof params._count !== 'number' || params._count < 0 || params._count > 1000) {
-      errors.push({
-        field: '_count',
-        message: '_count must be a number between 0 and 1000',
-        code: 'invalid-parameter'
-      });
-    }
-  }
-  
-  // Validate gender parameter
-  if (params.gender !== undefined) {
-    const validGenders = ['male', 'female', 'other', 'unknown'];
-    if (!validGenders.includes(params.gender)) {
-      errors.push({
-        field: 'gender',
-        message: `gender must be one of: ${validGenders.join(', ')}`,
-        code: 'invalid-parameter'
-      });
-    }
-  }
-  
-  // Validate active parameter
-  if (params.active !== undefined && typeof params.active !== 'boolean') {
-    errors.push({
-      field: 'active',
-      message: 'active must be a boolean value',
-      code: 'invalid-parameter'
-    });
-  }
-  
-  // Validate date format for birthdate
-  if (params.birthdate !== undefined) {
-    const dateRegex = /^\d{4}(-\d{2}(-\d{2})?)?$/;
-    if (!dateRegex.test(params.birthdate)) {
-      errors.push({
-        field: 'birthdate',
-        message: 'birthdate must be in YYYY, YYYY-MM, or YYYY-MM-DD format',
-        code: 'invalid-parameter'
-      });
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
+// Validation functions are now in utils/query-builder.ts
 
 // Type guards
 export function isPatient(resource: FHIRResource): resource is Patient {
   return resource.resourceType === 'Patient';
 }
 
-export function isBundle<T extends FHIRResource>(resource: FHIRResource): resource is Bundle<T> {
+export function isBundle<T extends FHIRResource>(
+  resource: FHIRResource
+): resource is Bundle<T> {
   return resource.resourceType === 'Bundle';
 }
 
-export function isOperationOutcome(resource: FHIRResource): resource is OperationOutcome {
+export function isOperationOutcome(
+  resource: FHIRResource
+): resource is OperationOutcome {
   return resource.resourceType === 'OperationOutcome';
 }
 
@@ -460,7 +443,16 @@ export interface BearerTokenConfig extends AuthenticationConfig {
 export interface JWTConfig extends AuthenticationConfig {
   type: 'jwt';
   token?: string;
-  algorithm?: 'HS256' | 'HS384' | 'HS512' | 'RS256' | 'RS384' | 'RS512' | 'ES256' | 'ES384' | 'ES512';
+  algorithm?:
+    | 'HS256'
+    | 'HS384'
+    | 'HS512'
+    | 'RS256'
+    | 'RS384'
+    | 'RS512'
+    | 'ES256'
+    | 'ES384'
+    | 'ES512';
   issuer?: string;
   audience?: string;
   subject?: string;
@@ -478,8 +470,6 @@ export interface NoAuthConfig extends AuthenticationConfig {
 }
 
 export type AuthConfig = JWTConfig | BearerTokenConfig | NoAuthConfig;
-
-
 
 // Client Configuration
 export interface FHIRClientConfig {
@@ -509,4 +499,42 @@ export interface HttpResponse<T = unknown> {
   status: number;
   statusText: string;
   headers: Record<string, string>;
+}
+
+// FHIR Capability Statement Types
+export interface CapabilityStatement extends FHIRResource {
+  resourceType: 'CapabilityStatement';
+  fhirVersion?: string;
+  rest?: CapabilityStatementRest[];
+}
+
+export interface CapabilityStatementRest {
+  mode?: 'client' | 'server';
+  resource?: CapabilityStatementResource[];
+}
+
+export interface CapabilityStatementResource {
+  type?: string;
+  interaction?: Array<{
+    code?: string;
+  }>;
+}
+
+// Error Response Types
+export interface ErrorResponse {
+  response?: {
+    status?: number;
+    statusText?: string;
+    data?: unknown;
+  };
+  message?: string;
+}
+
+export interface OperationOutcomeIssueDetailed {
+  severity: 'fatal' | 'error' | 'warning' | 'information';
+  code: string;
+  diagnostics?: string;
+  details?: {
+    text?: string;
+  };
 }

@@ -275,19 +275,269 @@ export class PatientQueryBuilder {
 
     /**
      * Execute the query and return an async iterator for streaming results
+     * Enhanced with better memory management and concurrent operations support
      */
-    async* stream(): AsyncIterable<Patient> {
+    async* stream(options?: {
+        pageSize?: number;
+        maxConcurrency?: number;
+        memoryLimit?: number;
+        onProgress?: (processed: number, total?: number) => void;
+    }): AsyncIterable<Patient> {
+        const {
+            pageSize = 50,
+            maxConcurrency = 1, // Default to 1 for backward compatibility
+            memoryLimit = 100 * 1024 * 1024, // 100MB default
+            onProgress
+        } = options || {};
+
+        // Validate streaming options
+        if (pageSize <= 0 || pageSize > 1000) {
+            throw new FHIRValidationError(
+                'pageSize must be between 1 and 1000',
+                'pageSize'
+            );
+        }
+
+        if (maxConcurrency <= 0 || maxConcurrency > 10) {
+            throw new FHIRValidationError(
+                'maxConcurrency must be between 1 and 10',
+                'maxConcurrency'
+            );
+        }
+
+        if (memoryLimit <= 0) {
+            throw new FHIRValidationError(
+                'memoryLimit must be greater than 0',
+                'memoryLimit'
+            );
+        }
+
+        // Use simple streaming for maxConcurrency = 1 (backward compatibility)
+        if (maxConcurrency === 1) {
+            // Use the existing _count parameter if set, otherwise use pageSize
+            const effectivePageSize = this.params._count || pageSize;
+            yield* this.streamSimple(effectivePageSize, onProgress);
+            return;
+        }
+
         // Create a clone to avoid modifying the original parameters
         const cloned = this.clone();
-        
-        // Set a reasonable page size if not already set
-        if (!cloned.params._count) {
-            cloned.params._count = 50;
-        }
+        cloned.params._count = pageSize;
 
         const startingOffset = cloned.params._offset || 0;
         let currentOffset = startingOffset;
         let hasMoreResults = true;
+        let totalProcessed = 0;
+        let memoryUsage = 0;
+
+        // Buffer for concurrent page fetching
+        const pageBuffer: Promise<Bundle<Patient>>[] = [];
+        let bufferIndex = 0;
+
+        while (hasMoreResults || pageBuffer.length > 0) {
+            // Fill buffer with concurrent requests up to maxConcurrency
+            while (pageBuffer.length < maxConcurrency && hasMoreResults) {
+                const pageCloned = cloned.clone();
+                pageCloned.params._offset = currentOffset;
+
+                const pagePromise = pageCloned.execute().catch(error => {
+                    // Convert errors to a special bundle to handle them gracefully
+                    return {
+                        resourceType: 'Bundle' as const,
+                        type: 'searchset' as const,
+                        entry: [],
+                        _error: error
+                    } as Bundle<Patient> & { _error: Error };
+                });
+
+                pageBuffer.push(pagePromise);
+                currentOffset += pageSize;
+            }
+
+            // Process the next page from buffer
+            if (pageBuffer.length > 0) {
+                const bundle = await pageBuffer.shift()!;
+
+                // Handle errors in the bundle
+                if (bundle && typeof bundle === 'object' && '_error' in bundle) {
+                    throw (bundle as any)._error;
+                }
+
+                // Check if bundle is valid
+                if (!bundle) {
+                    hasMoreResults = false;
+                    continue;
+                }
+
+                // Check memory usage and yield results
+                if (bundle.entry && bundle.entry.length > 0) {
+                    for (const entry of bundle.entry) {
+                        if (entry.resource) {
+                            // Estimate memory usage (rough calculation)
+                            const resourceSize = JSON.stringify(entry.resource).length * 2; // UTF-16
+                            memoryUsage += resourceSize;
+
+                            // Check memory limit
+                            if (memoryUsage > memoryLimit) {
+                                // Force garbage collection hint and reset counter
+                                if (global.gc) {
+                                    global.gc();
+                                }
+                                memoryUsage = 0;
+                            }
+
+                            yield entry.resource;
+                            totalProcessed++;
+
+                            // Report progress if callback provided
+                            if (onProgress) {
+                                onProgress(totalProcessed, bundle.total);
+                            }
+                        }
+                    }
+
+                    // Check if there are more results
+                    const returnedCount = bundle.entry.length;
+                    
+                    if (returnedCount < pageSize) {
+                        hasMoreResults = false;
+                    } else if (bundle.total !== undefined) {
+                        const totalExpected = bundle.total;
+                        hasMoreResults = (startingOffset + totalProcessed) < totalExpected;
+                    }
+                } else {
+                    // No entries in this page, we're done
+                    hasMoreResults = false;
+                }
+            }
+        }
+    }
+
+    /**
+     * Execute the query and return all results as an array with automatic pagination
+     * Enhanced with concurrent fetching and memory management
+     */
+    async fetchAll(options?: {
+        pageSize?: number;
+        maxConcurrency?: number;
+        maxResults?: number;
+        onProgress?: (processed: number, total?: number) => void;
+    }): Promise<Patient[]> {
+        const {
+            pageSize = 50,
+            maxConcurrency = 3,
+            maxResults = 10000,
+            onProgress
+        } = options || {};
+
+        // Validate options
+        if (pageSize <= 0 || pageSize > 1000) {
+            throw new FHIRValidationError(
+                'pageSize must be between 1 and 1000',
+                'pageSize'
+            );
+        }
+
+        if (maxConcurrency <= 0 || maxConcurrency > 10) {
+            throw new FHIRValidationError(
+                'maxConcurrency must be between 1 and 10',
+                'maxConcurrency'
+            );
+        }
+
+        if (maxResults <= 0) {
+            throw new FHIRValidationError(
+                'maxResults must be greater than 0',
+                'maxResults'
+            );
+        }
+
+        const results: Patient[] = [];
+        let processed = 0;
+
+        for await (const patient of this.stream({ 
+            pageSize, 
+            maxConcurrency, 
+            onProgress: (p, t) => {
+                processed = p;
+                if (onProgress) onProgress(p, t);
+            }
+        })) {
+            results.push(patient);
+            
+            // Check max results limit
+            if (results.length >= maxResults) {
+                break;
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Execute multiple queries concurrently and merge results
+     */
+    static async executeParallel(
+        queries: PatientQueryBuilder[],
+        options?: {
+            maxConcurrency?: number;
+            failFast?: boolean;
+        }
+    ): Promise<Bundle<Patient>[]> {
+        const { maxConcurrency = 5, failFast = true } = options || {};
+        
+        const results: Bundle<Patient>[] = [];
+        const errors: Error[] = [];
+
+        // Process queries in batches to respect concurrency limit
+        for (let i = 0; i < queries.length; i += maxConcurrency) {
+            const batch = queries.slice(i, i + maxConcurrency);
+            
+            const batchPromises = batch.map(async (query, index) => {
+                try {
+                    return await query.execute();
+                } catch (error) {
+                    if (failFast) {
+                        throw error;
+                    }
+                    errors.push(error as Error);
+                    return null;
+                }
+            });
+
+            const batchResults = await Promise.all(batchPromises);
+            
+            // Add successful results
+            for (const result of batchResults) {
+                if (result !== null) {
+                    results.push(result);
+                }
+            }
+        }
+
+        // If not failing fast, just log errors but return successful results
+        if (!failFast && errors.length > 0) {
+            console.warn(`${errors.length} queries failed:`, errors.map(e => e.message).join('; '));
+        }
+
+        return results;
+    }
+
+    /**
+     * Simple streaming implementation for backward compatibility
+     */
+    private async* streamSimple(
+        pageSize: number,
+        onProgress?: (processed: number, total?: number) => void
+    ): AsyncIterable<Patient> {
+        // Create a clone to avoid modifying the original parameters
+        const cloned = this.clone();
+        cloned.params._count = pageSize;
+
+        const startingOffset = cloned.params._offset || 0;
+        let currentOffset = startingOffset;
+        let hasMoreResults = true;
+        let totalProcessed = 0;
 
         while (hasMoreResults) {
             // Create a new clone for each request to avoid parameter mutation
@@ -302,23 +552,28 @@ export class PatientQueryBuilder {
                 for (const entry of bundle.entry) {
                     if (entry.resource) {
                         yield entry.resource;
+                        totalProcessed++;
+
+                        // Report progress if callback provided
+                        if (onProgress) {
+                            onProgress(totalProcessed, bundle.total);
+                        }
                     }
                 }
 
                 // Check if there are more results
                 const returnedCount = bundle.entry.length;
-                const requestedCount = cloned.params._count || 50;
                 
-                // If we got fewer results than requested, we've reached the end
-                // Also check if we have a total count and have reached it
-                if (returnedCount < requestedCount) {
+                // Check if we have a total count and have reached it
+                if (bundle.total !== undefined) {
+                    const totalExpected = bundle.total;
+                    hasMoreResults = (startingOffset + totalProcessed) < totalExpected;
+                } else if (returnedCount < pageSize) {
+                    // If no total is provided and we got fewer results than requested, we've reached the end
                     hasMoreResults = false;
-                } else if (bundle.total !== undefined) {
-                    const totalProcessed = currentOffset - startingOffset + returnedCount;
-                    hasMoreResults = totalProcessed < bundle.total;
                 } else {
                     // If no total is provided, continue until we get fewer results
-                    hasMoreResults = returnedCount === requestedCount;
+                    hasMoreResults = returnedCount === pageSize;
                 }
 
                 // Move to next page

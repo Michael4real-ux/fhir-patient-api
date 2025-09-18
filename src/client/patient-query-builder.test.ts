@@ -538,7 +538,7 @@ describe('PatientQueryBuilder', () => {
         streamedPatients.push(patient);
       }
 
-      expect(streamedPatients).toHaveLength(3);
+      expect(streamedPatients).toHaveLength(3); // Should get all 3 patients
       expect(streamedPatients[0].id).toBe('patient-1');
       expect(streamedPatients[1].id).toBe('patient-2');
       expect(streamedPatients[2].id).toBe('patient-3');
@@ -618,7 +618,7 @@ describe('PatientQueryBuilder', () => {
         streamedPatients.push(patient);
       }
 
-      expect(streamedPatients).toHaveLength(3);
+      expect(streamedPatients).toHaveLength(3); // Should get all 3 patients
       expect(mockExecuteFunction).toHaveBeenCalledTimes(2);
     });
 

@@ -81,6 +81,7 @@ export class FHIRClient {
 
   /**
    * Get patients with optional search parameters
+   * Enhanced with concurrent request support
    */
   async getPatients(params?: PatientSearchParams): Promise<Bundle<Patient>> {
     let sanitizedParams: PatientSearchParams | undefined;
@@ -286,6 +287,98 @@ export class FHIRClient {
    */
   async refreshAuth(): Promise<void> {
     await this.authManager.refreshAuth();
+  }
+
+  /**
+   * Execute multiple patient queries concurrently
+   */
+  async getPatientsConcurrent(
+    queries: PatientSearchParams[],
+    options?: {
+      maxConcurrency?: number;
+      failFast?: boolean;
+    }
+  ): Promise<Bundle<Patient>[]> {
+    const { maxConcurrency = 5, failFast = true } = options || {};
+    
+    const results: Bundle<Patient>[] = [];
+    const errors: Error[] = [];
+
+    // Process queries in batches to respect concurrency limit
+    for (let i = 0; i < queries.length; i += maxConcurrency) {
+      const batch = queries.slice(i, i + maxConcurrency);
+      
+      const batchPromises = batch.map(async (params) => {
+        try {
+          return await this.getPatients(params);
+        } catch (error) {
+          if (failFast) {
+            throw error;
+          }
+          errors.push(error as Error);
+          return null;
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Add successful results
+      for (const result of batchResults) {
+        if (result !== null) {
+          results.push(result);
+        }
+      }
+    }
+
+    // If not failing fast, just log errors but return successful results
+    if (!failFast && errors.length > 0) {
+      console.warn(`${errors.length} queries failed:`, errors.map(e => e.message).join('; '));
+    }
+
+    return results;
+  }
+
+  /**
+   * Get multiple patients by ID concurrently
+   */
+  async getPatientsByIdConcurrent(
+    ids: string[],
+    options?: {
+      maxConcurrency?: number;
+      failFast?: boolean;
+    }
+  ): Promise<(Patient | null)[]> {
+    const { maxConcurrency = 5, failFast = true } = options || {};
+    
+    const results: (Patient | null)[] = [];
+    const errors: Error[] = [];
+
+    // Process IDs in batches to respect concurrency limit
+    for (let i = 0; i < ids.length; i += maxConcurrency) {
+      const batch = ids.slice(i, i + maxConcurrency);
+      
+      const batchPromises = batch.map(async (id) => {
+        try {
+          return await this.getPatientById(id);
+        } catch (error) {
+          if (failFast) {
+            throw error;
+          }
+          errors.push(error as Error);
+          return null;
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+    }
+
+    // If not failing fast, just log errors but return results (including nulls for failures)
+    if (!failFast && errors.length > 0) {
+      console.warn(`${errors.length} patient fetches failed:`, errors.map(e => e.message).join('; '));
+    }
+
+    return results;
   }
 
   /**
